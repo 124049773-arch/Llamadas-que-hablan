@@ -9,6 +9,7 @@ import plotly.graph_objects as go
 import numpy as np
 import zipfile  # Necesario para leer el zip
 
+
 WIDTH = 650
 HEIGHT = 450
 
@@ -103,9 +104,10 @@ def load_data():
     except Exception as e:
         st.error(f"Error crítico: {e}")
         st.stop()
-
+# ==================== FILTERS ====================
+df = pd.read_csv(f, encoding="utf-8")
 df = load_data()
-
+st.write("Columnas detectadas en tu archivo:", df.columns.tolist())
 # ==================== FILTERS ====================
 st.sidebar.header("Filters")
 
