@@ -93,28 +93,50 @@ def load_data():
     csv_filename = "linea-mujeres-cdmx.csv"
     zip_filename = "linea-mujeres-cdmx.zip"
     
-    if not os.path.exists(csv_filename):
-        if os.path.exists(zip_filename):
-            try:
-                with zipfile.ZipFile(zip_filename, 'r') as zip_ref:
-                    zip_ref.extractall()
-            except Exception as e:
-                st.error(f"Error extracting ZIP file: {e}")
-                return pd.DataFrame()
-        else:
-            st.error(f"Neither {csv_filename} nor {zip_filename} found. Please upload the data files.")
+    # Check if CSV already exists
+    if os.path.exists(csv_filename):
+        try:
+            df = pd.read_csv(csv_filename, encoding="latin1")
+            df.columns = df.columns.str.lower().str.strip()
+            return df
+        except Exception as e:
+            st.error(f"Error reading CSV file: {e}")
             return pd.DataFrame()
     
-    try:
-        df = pd.read_csv(csv_filename, encoding="latin1")
-        df.columns = df.columns.str.lower().str.strip()
-        return df
-    except FileNotFoundError:
-        st.error(f"CSV file '{csv_filename}' not found after extraction.")
+    # Try to extract from ZIP
+    if os.path.exists(zip_filename):
+        try:
+            with zipfile.ZipFile(zip_filename, 'r') as zip_ref:
+                zip_ref.extractall()
+            
+            # Now try to read the CSV
+            if os.path.exists(csv_filename):
+                df = pd.read_csv(csv_filename, encoding="latin1")
+                df.columns = df.columns.str.lower().str.strip()
+                return df
+            else:
+                st.error(f"CSV file '{csv_filename}' not found in ZIP archive")
+                return pd.DataFrame()
+        except Exception as e:
+            st.error(f"Error extracting or reading ZIP file: {e}")
+            return pd.DataFrame()
+    else:
+        st.error(f"Neither '{csv_filename}' nor '{zip_filename}' found in the repository")
         return pd.DataFrame()
-    except Exception as e:
-        st.error(f"Error reading CSV: {e}")
-        return pd.DataFrame()
+
+# Load the data
+df = load_data()
+
+# Check if data loaded successfully
+if df.empty:
+    st.error("Failed to load data. Please check that the data files are present.")
+    st.stop()
+
+# ==================== FILTERS ====================
+st.sidebar.header("Filters")
+
+# Filter by State
+available_states = df['estado_usuaria'].unique()
 # ==================== FILTERS ====================
 st.sidebar.header("Filters")
 
