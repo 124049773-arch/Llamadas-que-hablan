@@ -89,7 +89,7 @@ init_database()
 
 @st.cache_data
 def load_data():
-    zip_path = "linea-mujeres-cdmx(1).zip"
+    zip_path = "linea-mujeres-cdm.zip"
     try:
         with zipfile.ZipFile(zip_path, 'r') as z:
             # Listamos todos los archivos dentro del zip
