@@ -7,6 +7,9 @@ import sqlite3
 from datetime import datetime
 import plotly.graph_objects as go
 import numpy as np
+import zipfile
+import os
+
 
 WIDTH = 650
 HEIGHT = 450
@@ -88,13 +91,16 @@ init_database()
 
 @st.cache_data
 def load_data():
-    # Usando el nombre original del archivo CSV
-    df = pd.read_csv("linea-mujeres-cdmx.csv", encoding="latin1")
+    # Si el CSV no existe, descomprimir el ZIP
+    csv_filename = "linea-mujeres-cdmx.csv"
+    
+    if not os.path.exists(csv_filename):
+        with zipfile.ZipFile("linea-mujeres-cdmx.zip", 'r') as zip_ref:
+            zip_ref.extractall()
+    
+    df = pd.read_csv(csv_filename, encoding="latin1")
     df.columns = df.columns.str.lower().str.strip()
     return df
-
-df = load_data()
-
 # ==================== FILTERS ====================
 st.sidebar.header("Filters")
 
