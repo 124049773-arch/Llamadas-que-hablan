@@ -88,9 +88,8 @@ def load_questionnaire_responses():
 # Initialize database
 init_database()
 # ==================== END DATABASE CONFIGURATION ====================
-
 @st.cache_data
-df = load_data():
+def load_data():
     # Si el CSV no existe, descomprimir el ZIP
     csv_filename = "linea-mujeres-cdmx.csv"
     
@@ -101,6 +100,9 @@ df = load_data():
     df = pd.read_csv(csv_filename, encoding="latin1")
     df.columns = df.columns.str.lower().str.strip()
     return df
+
+# Llamar la función para obtener los datos
+df = load_data()
 # ==================== FILTERS ====================
 st.sidebar.header("Filters")
 
