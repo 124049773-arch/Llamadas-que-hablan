@@ -87,7 +87,6 @@ def load_questionnaire_responses():
 
 # Initialize database
 init_database()
-# ==================== END DATABASE CONFIGURATION ====================
 @st.cache_data
 def load_data():
     csv_filename = "linea-mujeres-cdmx.csv"
@@ -95,7 +94,7 @@ def load_data():
     
     if os.path.exists(csv_filename):
         try:
-            df = pd.read_csv(csv_filename, encoding="latin1")
+            df = pd.read_csv(csv_filename, encoding="latin1", sep=",")
             df.columns = df.columns.str.lower().str.strip()
             return df
         except Exception as e:
@@ -114,17 +113,32 @@ def load_data():
                 
                 zip_ref.extractall()
                 csv_to_read = csv_files[0]
-                st.info(f"Loading data from: {csv_to_read}")
                 
                 if os.path.exists(csv_to_read):
-                    df = pd.read_csv(csv_to_read, encoding="latin1")
+                    # Read with explicit parameters
+                    df = pd.read_csv(
+                        csv_to_read, 
+                        encoding="latin1", 
+                        sep=",",
+                        dtype=str  # Read all as strings first to preserve data
+                    )
+                    # Clean column names
                     df.columns = df.columns.str.lower().str.strip()
+                    
+                    # Convert numeric columns
+                    numeric_cols = ['edad', 'ano_alta', 'mes_alta', 'dia_alta', 'hora_alta']
+                    for col in numeric_cols:
+                        if col in df.columns:
+                            df[col] = pd.to_numeric(df[col], errors='coerce')
+                    
                     return df
                 else:
                     st.error(f"CSV file '{csv_to_read}' not found after extraction")
                     return pd.DataFrame()
         except Exception as e:
             st.error(f"Error extracting or reading ZIP file: {e}")
+            import traceback
+            st.error(traceback.format_exc())
             return pd.DataFrame()
     else:
         st.error(f"ZIP file '{zip_filename}' not found in the repository")
@@ -136,9 +150,14 @@ if df.empty:
     st.error("Failed to load data. Please check that the data files are present.")
     st.stop()
 
-# DEBUG: Display actual column names
-st.write("**Actual columns in the dataset:**")
-st.write(df.columns.tolist())
+# Verify expected columns exist
+expected_cols = ['estado_usuaria', 'municipio_usuaria', 'edad', 'ocupacion']
+missing_cols = [col for col in expected_cols if col not in df.columns]
+
+if missing_cols:
+    st.error(f"Missing expected columns: {missing_cols}")
+    st.write("Available columns:", df.columns.tolist())
+    st.stop()
 
 # ==================== FILTERS ====================
 st.sidebar.header("Filters")
