@@ -90,7 +90,7 @@ init_database()
 # ==================== END DATABASE CONFIGURATION ====================
 
 @st.cache_data
-def load_data():
+df = load_data():
     # Si el CSV no existe, descomprimir el ZIP
     csv_filename = "linea-mujeres-cdmx.csv"
     
