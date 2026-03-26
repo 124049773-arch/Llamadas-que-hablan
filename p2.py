@@ -93,7 +93,6 @@ def load_data():
     csv_filename = "linea-mujeres-cdmx.csv"
     zip_filename = "linea-mujeres-cdmx.zip"
     
-    # Check if CSV already exists
     if os.path.exists(csv_filename):
         try:
             df = pd.read_csv(csv_filename, encoding="latin1")
@@ -103,24 +102,17 @@ def load_data():
             st.error(f"Error reading CSV file: {e}")
             return pd.DataFrame()
     
-    # Try to extract from ZIP and find CSV files
     if os.path.exists(zip_filename):
         try:
             with zipfile.ZipFile(zip_filename, 'r') as zip_ref:
-                # List all files in the ZIP
                 file_list = zip_ref.namelist()
-                
-                # Find CSV files
                 csv_files = [f for f in file_list if f.endswith('.csv')]
                 
                 if not csv_files:
                     st.error(f"No CSV files found in {zip_filename}")
                     return pd.DataFrame()
                 
-                # Extract all files
                 zip_ref.extractall()
-                
-                # Try to read the first CSV file found
                 csv_to_read = csv_files[0]
                 st.info(f"Loading data from: {csv_to_read}")
                 
@@ -138,13 +130,15 @@ def load_data():
         st.error(f"ZIP file '{zip_filename}' not found in the repository")
         return pd.DataFrame()
 
-# Load the data
 df = load_data()
 
-# Check if data loaded successfully
 if df.empty:
     st.error("Failed to load data. Please check that the data files are present.")
     st.stop()
+
+# DEBUG: Display actual column names
+st.write("**Actual columns in the dataset:**")
+st.write(df.columns.tolist())
 
 # ==================== FILTERS ====================
 st.sidebar.header("Filters")
