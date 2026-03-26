@@ -11,7 +11,7 @@ import numpy as np
 WIDTH = 650
 HEIGHT = 450
 
-st.set_page_config(page_title="Dashb Línea de Mujeres", layout="wide")
+st.set_page_config(page_title="Women's Line Dashboard", layout="wide")
 
 st.markdown("""
 <style>
@@ -26,487 +26,488 @@ h1 {color: #6B21A8;}
 </style>
 """, unsafe_allow_html=True)
 
-st.title("Llamadas que hablan Línea de Mujeres CDMX")
-st.title("La cicatriz es la prueba de que sobreviviste, pero tu brillo es la prueba de que venciste")
-st.markdown("Visualización dinámica de los reportes de atención.")
+st.title("Calls that Speak - Women's Line CDMX")
+st.title("The scar is proof you survived, but your shine is proof you conquered")
+st.markdown("Dynamic visualization of care reports.")
 
-# ==================== CONFIGURACIÓN DE BASE DE DATOS ====================
+# ==================== DATABASE CONFIGURATION ====================
 def init_database():
-    """Inicializa la base de datos SQLite"""
-    conn = sqlite3.connect('cuestionario_mujeres.db')
+    """Initializes the SQLite database"""
+    conn = sqlite3.connect('questionnaire_women.db')
     c = conn.cursor()
     
-    c.execute('''CREATE TABLE IF NOT EXISTS respuestas_cuestionario (
+    c.execute('''CREATE TABLE IF NOT EXISTS questionnaire_responses (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        fecha TIMESTAMP,
-        edad_grupo TEXT,
-        situacion TEXT,
-        frecuencia TEXT,
-        relacion TEXT,
-        hablado_alguien TEXT
+        timestamp TIMESTAMP,
+        age_group TEXT,
+        situation TEXT,
+        frequency TEXT,
+        relationship TEXT,
+        talked_to_someone TEXT
     )''')
     
     conn.commit()
     conn.close()
 
-def guardar_respuesta(datos):
-    """Guarda las respuestas del cuestionario en la base de datos"""
+def save_response(data):
+    """Saves questionnaire responses to the database"""
     try:
-        conn = sqlite3.connect('cuestionario_mujeres.db')
+        conn = sqlite3.connect('questionnaire_women.db')
         c = conn.cursor()
         
-        c.execute('''INSERT INTO respuestas_cuestionario 
-                    (fecha, edad_grupo, situacion, frecuencia, relacion, hablado_alguien)
+        c.execute('''INSERT INTO questionnaire_responses 
+                    (timestamp, age_group, situation, frequency, relationship, talked_to_someone)
                     VALUES (?, ?, ?, ?, ?, ?)''',
                   (datetime.now(), 
-                   datos['edad_grupo'],
-                   datos['situacion'],
-                   datos['frecuencia'],
-                   datos['relacion'],
-                   datos['hablado_alguien']))
+                   data['age_group'],
+                   data['situation'],
+                   data['frequency'],
+                   data['relationship'],
+                   data['talked_to_someone']))
         
         conn.commit()
         conn.close()
         return True
     except Exception as e:
-        st.error(f"Error al guardar: {e}")
+        st.error(f"Error saving: {e}")
         return False
 
-def cargar_respuestas_cuestionario():
-    """Carga las respuestas del cuestionario para análisis"""
+def load_questionnaire_responses():
+    """Loads questionnaire responses for analysis"""
     try:
-        conn = sqlite3.connect('cuestionario_mujeres.db')
-        df = pd.read_sql_query("SELECT * FROM respuestas_cuestionario", conn)
+        conn = sqlite3.connect('questionnaire_women.db')
+        df = pd.read_sql_query("SELECT * FROM questionnaire_responses", conn)
         conn.close()
         return df
     except:
         return pd.DataFrame()
 
-# Inicializar base de datos
+# Initialize database
 init_database()
-# ==================== FIN CONFIGURACIÓN BASE DE DATOS ====================
+# ==================== END DATABASE CONFIGURATION ====================
 
 @st.cache_data
 def load_data():
+    # Usando el nombre original del archivo CSV
     df = pd.read_csv("linea-mujeres-cdmx.csv", encoding="latin1")
     df.columns = df.columns.str.lower().str.strip()
     return df
 
 df = load_data()
 
-# ==================== FILTROS ====================
-st.sidebar.header("Filtros")
+# ==================== FILTERS ====================
+st.sidebar.header("Filters")
 
-# Filtro por Estado
-estados_disponibles = df['estado_usuaria'].unique()
-estado = st.sidebar.multiselect(
-    "Selecciona Estado:",
-    options=estados_disponibles,
-    default=estados_disponibles[:3] if len(estados_disponibles) > 3 else estados_disponibles
+# Filter by State
+available_states = df['estado_usuaria'].unique()
+state = st.sidebar.multiselect(
+    "Select State:",
+    options=available_states,
+    default=available_states[:3] if len(available_states) > 3 else available_states
 )
 
-# Filtrar por estado primero
-if estado:
-    df_filtrado_estado = df[df['estado_usuaria'].isin(estado)]
+# Filter by state first
+if state:
+    filtered_df_state = df[df['estado_usuaria'].isin(state)]
 else:
-    df_filtrado_estado = df
+    filtered_df_state = df
 
-# Filtro por Municipio
-municipios_disponibles = df_filtrado_estado['municipio_usuaria'].unique()
-municipio = st.sidebar.multiselect(
-    "Selecciona Municipio:",
-    options=municipios_disponibles,
-    default=municipios_disponibles[:5] if len(municipios_disponibles) > 5 else municipios_disponibles
+# Filter by Municipality
+available_municipalities = filtered_df_state['municipio_usuaria'].unique()
+municipality = st.sidebar.multiselect(
+    "Select Municipality:",
+    options=available_municipalities,
+    default=available_municipalities[:5] if len(available_municipalities) > 5 else available_municipalities
 )
 
-# Aplicar filtro de municipio
-if municipio:
-    df_selection = df_filtrado_estado[df_filtrado_estado['municipio_usuaria'].isin(municipio)]
+# Apply municipality filter
+if municipality:
+    df_selection = filtered_df_state[filtered_df_state['municipio_usuaria'].isin(municipality)]
 else:
-    df_selection = df_filtrado_estado
+    df_selection = filtered_df_state
 
 col1, col2, col3 = st.columns(3)
-col1.metric("Total Reportes", f"{len(df_selection):,}")
-edad_promedio = pd.to_numeric(df_selection['edad'], errors='coerce').mean()
-col2.metric("Edad Promedio", f"{edad_promedio:.0f}" if not pd.isna(edad_promedio) else "N/A")
-col3.metric("Municipios", f"{len(municipio) if municipio else len(df_selection['municipio_usuaria'].unique())}")
+col1.metric("Total Reports", f"{len(df_selection):,}")
+avg_age = pd.to_numeric(df_selection['edad'], errors='coerce').mean()
+col2.metric("Average Age", f"{avg_age:.0f}" if not pd.isna(avg_age) else "N/A")
+col3.metric("Municipalities", f"{len(municipality) if municipality else len(df_selection['municipio_usuaria'].unique())}")
 
-# ==================== GRÁFICA 1: DISTRIBUCIÓN POR OCUPACIÓN ====================
+# ==================== GRAPH 1: DISTRIBUTION BY OCCUPATION ====================
 c1, c2 = st.columns([2,1])
 
 with c1:
-    st.subheader("Distribución por Ocupación")
-    fig_ocupacion = px.pie(df_selection, names='ocupacion', hole=0.6,
+    st.subheader("Distribution by Occupation")
+    fig_occupation = px.pie(df_selection, names='ocupacion', hole=0.6,
         color_discrete_sequence=["#E6CCFF","#D8B4FE","#C084FC","#A855F7","#9333EA","#7E22CE"])
-    fig_ocupacion.update_layout(width=WIDTH, height=HEIGHT)
-    st.plotly_chart(fig_ocupacion, use_container_width=False)
+    fig_occupation.update_layout(width=WIDTH, height=HEIGHT)
+    st.plotly_chart(fig_occupation, use_container_width=False)
 
 with c2:
-    st.subheader("Análisis gráfico")
+    st.subheader("Graph Analysis")
     st.write("""
-    - La gráfica muestra la distribución de las ocupaciones de las usuarias que realizaron llamadas.
-    - Se observa qué grupos ocupacionales tienen mayor presencia en los reportes.
-    - Las porciones más grandes indican los sectores laborales con más casos.
-    - Esto permite focalizar campañas de prevención en sectores específicos.
+    - The graph shows the distribution of occupations of users who made calls.
+    - It shows which occupational groups have the highest presence in reports.
+    - Larger portions indicate labor sectors with more cases.
+    - This helps focus prevention campaigns on specific sectors.
     """)
 
-# ==================== GRÁFICA 2: ATENCIONES POR MES ====================
+# ==================== GRAPH 2: ATTENTIONS BY MONTH ====================
 c3, c4 = st.columns([2,1])
 
 with c3:
-    st.subheader("Atenciones por Mes")
-    mes_counts = df_selection['mes_alta'].value_counts().reset_index()
-    mes_counts.columns = ['mes', 'total']
-    fig_mes = px.bar(mes_counts.sort_values(by='mes'), x='mes', y='total',
-        labels={'mes': 'Mes del Año', 'total': 'Número de llamadas'},
+    st.subheader("Attentions by Month")
+    month_counts = df_selection['mes_alta'].value_counts().reset_index()
+    month_counts.columns = ['month', 'total']
+    fig_month = px.bar(month_counts.sort_values(by='month'), x='month', y='total',
+        labels={'month': 'Month of the Year', 'total': 'Number of calls'},
         color_discrete_sequence=['#9333EA'])
-    fig_mes.update_layout(width=WIDTH, height=HEIGHT)
-    st.plotly_chart(fig_mes, use_container_width=False)
+    fig_month.update_layout(width=WIDTH, height=HEIGHT)
+    st.plotly_chart(fig_month, use_container_width=False)
 
 with c4:
-    st.subheader("Análisis gráfico")
+    st.subheader("Graph Analysis")
     st.write("""
-    - La gráfica muestra la distribución de llamadas por cada mes del año.
-    - Se identifican los meses con mayor y menor número de reportes.
-    - Los picos más altos indican épocas de mayor demanda de atención.
-    - Permite planificar recursos según la demanda estacional.
+    - The graph shows call distribution for each month of the year.
+    - Identifies months with the highest and lowest number of reports.
+    - Highest peaks indicate times of greatest demand for attention.
+    - Helps plan resources according to seasonal demand.
     """)
 
-# ==================== GRÁFICA 3: DISTRIBUCIÓN DE EDADES ====================
+# ==================== GRAPH 3: AGE DISTRIBUTION ====================
 c5, c6 = st.columns([2,1])
 
 with c5:
-    st.subheader("Distribución de Edades")
-    bins = st.slider("Número de intervalos (bins)", 5, 50, 20, key="bins_edad")
-    fig_edad = px.histogram(df_selection, x="edad", nbins=bins,
-        title="Distribución de Edades de las Usuarias", color_discrete_sequence=['#FFA200'])
-    fig_edad.update_layout(width=WIDTH, height=HEIGHT)
-    st.plotly_chart(fig_edad, use_container_width=False)
+    st.subheader("Age Distribution")
+    bins = st.slider("Number of intervals (bins)", 5, 50, 20, key="age_bins")
+    fig_age = px.histogram(df_selection, x="edad", nbins=bins,
+        title="Age Distribution of Users", color_discrete_sequence=['#FFA200'])
+    fig_age.update_layout(width=WIDTH, height=HEIGHT)
+    st.plotly_chart(fig_age, use_container_width=False)
 
 with c6:
-    st.subheader("Análisis gráfico")
+    st.subheader("Graph Analysis")
     st.write("""
-    - La gráfica muestra la concentración de edades de las usuarias que reportan.
-    - Se observa que la mayoría de las personas se concentran entre los 30 y 50 años.
-    - Hay menos casos en edades muy jóvenes y en edades muy avanzadas.
-    - El núcleo más fuerte está en edades medias, los extremos son poco frecuentes.
+    - The graph shows the age concentration of users who report.
+    - Most people are concentrated between 30 and 50 years old.
+    - There are fewer cases among very young and very old ages.
+    - The strongest core is in middle ages, extremes are rare.
     """)
 
-# ==================== GRÁFICA 4: FRECUENCIA POR ESTADO CIVIL ====================
+# ==================== GRAPH 4: FREQUENCY BY MARITAL STATUS ====================
 c7, c8 = st.columns([2,1])
 
 with c7:
     if 'estado_civil' in df.columns:
-        st.subheader("Frecuencia por estado civil")
-        conteo_ec = df['estado_civil'].value_counts().reset_index()
-        conteo_ec.columns = ['estado_civil', 'total']
-        fig_ec = px.bar(conteo_ec, x='estado_civil', y='total', color_discrete_sequence=["#9333EA"])
-        fig_ec.update_layout(width=WIDTH, height=HEIGHT, xaxis_tickangle=45)
-        st.plotly_chart(fig_ec, use_container_width=False)
+        st.subheader("Frequency by marital status")
+        count_ms = df['estado_civil'].value_counts().reset_index()
+        count_ms.columns = ['marital_status', 'total']
+        fig_ms = px.bar(count_ms, x='marital_status', y='total', color_discrete_sequence=["#9333EA"])
+        fig_ms.update_layout(width=WIDTH, height=HEIGHT, xaxis_tickangle=45)
+        st.plotly_chart(fig_ms, use_container_width=False)
 
 with c8:
-    st.subheader("Análisis gráfico")
+    st.subheader("Graph Analysis")
     st.write("""
-    - La gráfica muestra la distribución por estado civil de las mujeres que reportan.
-    - Se observa que la mayoría son mujeres solteras con alrededor de 250 mil registros.
-    - Le siguen las mujeres casadas con aproximadamente 150 mil casos.
-    - Las de unión libre tienen cerca de 50 mil casos registrados.
+    - The graph shows distribution by marital status of women who report.
+    - Most are single women with around 250,000 records.
+    - Followed by married women with approximately 150,000 cases.
+    - Those in common-law relationships have about 50,000 registered cases.
     """)
 
-# ==================== GRÁFICA 5: EVOLUCIÓN MENSUAL DE LLAMADAS ====================
+# ==================== GRAPH 5: MONTHLY CALL EVOLUTION ====================
 c9, c10 = st.columns([2,1])
 
 with c9:
-    st.subheader("Evolución mensual de llamadas")
+    st.subheader("Monthly call evolution")
     df_temp = df.copy()
     df_temp['fecha_alta'] = pd.to_datetime(df_temp['fecha_alta'], errors='coerce')
     df_temp = df_temp.dropna(subset=['fecha_alta'])
-    df_temp['anio_mes'] = df_temp['fecha_alta'].dt.to_period('M').astype(str)
-    llamadas_por_mes = df_temp.groupby('anio_mes').size().reset_index()
-    llamadas_por_mes.columns = ['anio_mes', 'total']
-    fig_ev = px.line(llamadas_por_mes, x='anio_mes', y='total', markers=True)
+    df_temp['year_month'] = df_temp['fecha_alta'].dt.to_period('M').astype(str)
+    calls_per_month = df_temp.groupby('year_month').size().reset_index()
+    calls_per_month.columns = ['year_month', 'total']
+    fig_ev = px.line(calls_per_month, x='year_month', y='total', markers=True)
     fig_ev.update_layout(width=WIDTH, height=HEIGHT, xaxis_tickangle=90)
     st.plotly_chart(fig_ev, use_container_width=False)
 
 with c10:
-    st.subheader("Análisis gráfico")
+    st.subheader("Graph Analysis")
     st.write("""
-    - La gráfica muestra la evolución de las llamadas a lo largo del tiempo.
-    - Se observa un aumento al inicio, luego se mantuvieron con altibajos.
-    - Finalmente se ve una caída significativa en los últimos períodos.
-    - Permite identificar tendencias y evaluar el impacto de intervenciones.
+    - The graph shows call evolution over time.
+    - An initial increase is observed, then they remained with ups and downs.
+    - Finally, a significant decrease is seen in recent periods.
+    - Helps identify trends and evaluate intervention impact.
     """)
 
-# ==================== GRÁFICA 6: CLUSTERS EDAD VS SERVICIO ====================
+# ==================== GRAPH 6: CLUSTERS AGE VS SERVICE ====================
 c11, c12 = st.columns([2,1])
 
 with c11:
-    st.subheader("Clusters de llamadas (Edad vs Servicio)")
+    st.subheader("Call clusters (Age vs Service)")
     df_num = df.select_dtypes(include=['int64','float64']).fillna(df.median(numeric_only=True))
     scaler = StandardScaler()
-    datos_escalados = scaler.fit_transform(df_num)
+    scaled_data = scaler.fit_transform(df_num)
     kmeans = KMeans(n_clusters=3, random_state=42)
-    df['cluster'] = kmeans.fit_predict(datos_escalados)
+    df['cluster'] = kmeans.fit_predict(scaled_data)
     if 'edad' in df.columns and 'servicio' in df.columns:
         fig_cl = px.scatter(df, x='edad', y='servicio', color='cluster', color_continuous_scale='viridis')
         fig_cl.update_layout(width=WIDTH, height=HEIGHT)
         st.plotly_chart(fig_cl, use_container_width=False)
 
 with c12:
-    st.subheader("Análisis gráfico")
+    st.subheader("Graph Analysis")
     st.write("""
-    - El eje horizontal indica la edad de las mujeres que llamaron.
-    - El eje vertical indica el tipo de asesoría requerida.
-    - Los puntos representan las llamadas y el color indica a qué grupo de edad pertenecen.
-    - Permite identificar patrones de servicio según rangos de edad.
+    - The horizontal axis indicates the age of women who called.
+    - The vertical axis indicates the type of counseling required.
+    - Points represent calls and color indicates which age group they belong to.
+    - Helps identify service patterns according to age ranges.
     """)
 
-# ==================== ANÁLISIS DE TEMÁTICAS ====================
-st.header("Análisis de Temáticas")
+# ==================== TOPIC ANALYSIS ====================
+st.header("Topic Analysis")
 
-# Preparar datos de temáticas
-columnas_tematicas = ['tematica_1', 'tematica_2', 'tematica_3', 'tematica_4', 'tematica_5', 'tematica_6', 'tematica_7']
-tematicas_existentes = [col for col in columnas_tematicas if col in df.columns]
+# Prepare topic data
+topic_columns = ['tematica_1', 'tematica_2', 'tematica_3', 'tematica_4', 'tematica_5', 'tematica_6', 'tematica_7']
+existing_topics = [col for col in topic_columns if col in df.columns]
 
-if tematicas_existentes:
-    # Crear versión expandida para análisis
+if existing_topics:
+    # Create expanded version for analysis
     df_temp = df_selection.copy()
-    for col in tematicas_existentes:
-        df_temp[col] = df_temp[col].fillna('No especificado')
+    for col in existing_topics:
+        df_temp[col] = df_temp[col].fillna('Not specified')
     
-    df_temp['tematicas_lista'] = df_temp[tematicas_existentes].apply(lambda x: x.tolist(), axis=1)
-    df_exploded = df_temp.explode('tematicas_lista')
-    df_exploded = df_exploded[df_exploded['tematicas_lista'] != 'No especificado']
-    df_exploded = df_exploded.rename(columns={'tematicas_lista': 'tematica'})
+    df_temp['topics_list'] = df_temp[existing_topics].apply(lambda x: x.tolist(), axis=1)
+    df_exploded = df_temp.explode('topics_list')
+    df_exploded = df_exploded[df_exploded['topics_list'] != 'Not specified']
+    df_exploded = df_exploded.rename(columns={'topics_list': 'topic'})
     
-    # Crear grupos de edad
+    # Create age groups
     df_exploded['edad'] = pd.to_numeric(df_exploded['edad'], errors='coerce')
-    df_exploded['grupo_edad'] = pd.cut(
+    df_exploded['age_group'] = pd.cut(
         df_exploded['edad'],
         bins=[0, 18, 25, 35, 45, 100],
-        labels=['<18 años', '18-25 años', '26-35 años', '36-45 años', '>45 años']
+        labels=['<18 years', '18-25 years', '26-35 years', '36-45 years', '>45 years']
     )
     
-    # GRÁFICA 7: TOP 15 TEMÁTICAS MÁS REPORTADAS
-    c_tem1, c_tem2 = st.columns([2,1])
+    # GRAPH 7: TOP 15 MOST REPORTED TOPICS
+    c_topic1, c_topic2 = st.columns([2,1])
     
-    with c_tem1:
-        st.subheader("Top 15 temáticas más reportadas")
+    with c_topic1:
+        st.subheader("Top 15 most reported topics")
         
-        top_tematicas = df_exploded['tematica'].value_counts().head(15)
+        top_topics = df_exploded['topic'].value_counts().head(15)
         
-        fig_top_tematicas = px.bar(
-            x=top_tematicas.values, 
-            y=top_tematicas.index,
+        fig_top_topics = px.bar(
+            x=top_topics.values, 
+            y=top_topics.index,
             orientation='h',
-            labels={'x': 'Número de casos', 'y': 'Temática'},
-            color=top_tematicas.values,
+            labels={'x': 'Number of cases', 'y': 'Topic'},
+            color=top_topics.values,
             color_continuous_scale='Purples_r'
         )
-        fig_top_tematicas.update_layout(width=WIDTH, height=HEIGHT, yaxis=dict(autorange="reversed"))
-        st.plotly_chart(fig_top_tematicas, use_container_width=False)
+        fig_top_topics.update_layout(width=WIDTH, height=HEIGHT, yaxis=dict(autorange="reversed"))
+        st.plotly_chart(fig_top_topics, use_container_width=False)
     
-    with c_tem2:
-        st.subheader("Análisis gráfico")
+    with c_topic2:
+        st.subheader("Graph Analysis")
         st.write("""
-        - La gráfica muestra las 15 problemáticas más frecuentes reportadas por las usuarias.
-        - Las barras más largas y de color morado más oscuro representan los problemas más comunes.
-        - Se observa una clara concentración en las primeras 3-4 temáticas, lo que indica problemas prioritarios.
-        - La temática con mayor número de casos debe ser la principal atención de los programas de apoyo.
+        - The graph shows the 15 most frequent problems reported by users.
+        - Longer bars with darker purple color represent the most common problems.
+        - A clear concentration is observed in the first 3-4 topics, indicating priority problems.
+        - The topic with the highest number of cases should be the main focus of support programs.
         """)
     
-    # GRÁFICA 8: DISTRIBUCIÓN DE TEMÁTICAS POR GRUPO DE EDAD
-    c_tem3, c_tem4 = st.columns([2,1])
+    # GRAPH 8: TOPIC DISTRIBUTION BY AGE GROUP
+    c_topic3, c_topic4 = st.columns([2,1])
     
-    with c_tem3:
-        st.subheader("Distribución de temáticas por grupo de edad")
+    with c_topic3:
+        st.subheader("Topic distribution by age group")
         
-        # Seleccionar top 8 temáticas
-        top8 = df_exploded['tematica'].value_counts().head(8).index
-        df_top8 = df_exploded[df_exploded['tematica'].isin(top8)]
+        # Select top 8 topics
+        top8 = df_exploded['topic'].value_counts().head(8).index
+        df_top8 = df_exploded[df_exploded['topic'].isin(top8)]
         
-        # Crear tabla de contingencia
-        edad_tematica = pd.crosstab(df_top8['tematica'], df_top8['grupo_edad'])
+        # Create contingency table
+        age_topic = pd.crosstab(df_top8['topic'], df_top8['age_group'])
         
-        # Colores de morado para grupos de edad
-        colores_morados = ['#4A0E4E', '#6B2E6B', '#8B4B8B', '#AA6EAA', '#C999C9']
+        # Purple colors for age groups
+        purple_colors = ['#4A0E4E', '#6B2E6B', '#8B4B8B', '#AA6EAA', '#C999C9']
         
-        fig_tematica_edad = px.bar(
-            edad_tematica,
-            labels={'value': 'Número de casos', 'tematica': 'Temática', 'variable': 'Grupo de Edad'},
-            color_discrete_sequence=colores_morados,
+        fig_topic_age = px.bar(
+            age_topic,
+            labels={'value': 'Number of cases', 'topic': 'Topic', 'variable': 'Age Group'},
+            color_discrete_sequence=purple_colors,
             barmode='stack'
         )
-        fig_tematica_edad.update_layout(width=WIDTH, height=HEIGHT, xaxis_tickangle=45)
-        st.plotly_chart(fig_tematica_edad, use_container_width=False)
+        fig_topic_age.update_layout(width=WIDTH, height=HEIGHT, xaxis_tickangle=45)
+        st.plotly_chart(fig_topic_age, use_container_width=False)
     
-    with c_tem4:
-        st.subheader("Análisis gráfico")
+    with c_topic4:
+        st.subheader("Graph Analysis")
         st.write("""
-        - La gráfica muestra cómo se distribuyen las problemáticas según la edad de las usuarias.
-        - El color morado más oscuro (#4A0E4E) representa al grupo de menor edad (<18 años).
-        - El color morado más claro (#C999C9) representa al grupo de mayor edad (>45 años).
-        - Se observa qué problemáticas afectan más a jóvenes y cuáles a adultas mayores.
-        - Los colores equilibrados indican problemáticas que afectan a todas las edades.
+        - The graph shows how problems are distributed according to user age.
+        - The darkest purple color (#4A0E4E) represents the youngest group (<18 years).
+        - The lightest purple color (#C999C9) represents the oldest group (>45 years).
+        - Shows which problems affect younger women more and which affect older women.
+        - Balanced colors indicate problems affecting all ages.
         """)
 
 else:
-    st.warning("No se encontraron columnas de temáticas en los datos")
+    st.warning("No topic columns found in the data")
 
-# ==================== ANÁLISIS DE ESCOLARIDAD ====================
-st.header("Análisis de Escolaridad")
+# ==================== EDUCATION LEVEL ANALYSIS ====================
+st.header("Education Level Analysis")
 
 if 'escolaridad' in df.columns:
-    # Preparar datos de temáticas para análisis con escolaridad
-    columnas_tematicas = ['tematica_1', 'tematica_2', 'tematica_3', 'tematica_4', 'tematica_5', 'tematica_6', 'tematica_7']
-    tematicas_existentes_esc = [col for col in columnas_tematicas if col in df.columns]
+    # Prepare topic data for education analysis
+    topic_columns = ['tematica_1', 'tematica_2', 'tematica_3', 'tematica_4', 'tematica_5', 'tematica_6', 'tematica_7']
+    existing_topics_edu = [col for col in topic_columns if col in df.columns]
     
-    if tematicas_existentes_esc:
-        df_temp_esc = df_selection.copy()
-        for col in tematicas_existentes_esc:
-            df_temp_esc[col] = df_temp_esc[col].fillna('No especificado')
+    if existing_topics_edu:
+        df_temp_edu = df_selection.copy()
+        for col in existing_topics_edu:
+            df_temp_edu[col] = df_temp_edu[col].fillna('Not specified')
         
-        df_temp_esc['tematicas_lista'] = df_temp_esc[tematicas_existentes_esc].apply(lambda x: x.tolist(), axis=1)
-        df_exploded_esc = df_temp_esc.explode('tematicas_lista')
-        df_exploded_esc = df_exploded_esc[df_exploded_esc['tematicas_lista'] != 'No especificado']
-        df_exploded_esc = df_exploded_esc.rename(columns={'tematicas_lista': 'tematica'})
+        df_temp_edu['topics_list'] = df_temp_edu[existing_topics_edu].apply(lambda x: x.tolist(), axis=1)
+        df_exploded_edu = df_temp_edu.explode('topics_list')
+        df_exploded_edu = df_exploded_edu[df_exploded_edu['topics_list'] != 'Not specified']
+        df_exploded_edu = df_exploded_edu.rename(columns={'topics_list': 'topic'})
     else:
-        df_exploded_esc = df_selection.copy()
+        df_exploded_edu = df_selection.copy()
     
-    # GRÁFICA 9: ESCOLARIDAD VS TIPO DE VIOLENCIA
-    c_esc1, c_esc2 = st.columns([2,1])
+    # GRAPH 9: EDUCATION LEVEL VS TYPE OF VIOLENCE
+    c_edu1, c_edu2 = st.columns([2,1])
     
-    with c_esc1:
-        st.subheader("Escolaridad vs Tipo de Violencia")
+    with c_edu1:
+        st.subheader("Education Level vs Type of Violence")
         
-        if 'tematica' in df_exploded_esc.columns:
-            # Crear tabla de contingencia
-            escolaridad_violencia = pd.crosstab(df_exploded_esc['tematica'], df_exploded_esc['escolaridad'])
+        if 'topic' in df_exploded_edu.columns:
+            # Create contingency table
+            education_violence = pd.crosstab(df_exploded_edu['topic'], df_exploded_edu['escolaridad'])
             
-            # Seleccionar top 10 temáticas
-            top10_esc = escolaridad_violencia.sum(axis=1).sort_values(ascending=False).head(10).index
-            escolaridad_violencia_top = escolaridad_violencia.loc[top10_esc]
+            # Select top 10 topics
+            top10_edu = education_violence.sum(axis=1).sort_values(ascending=False).head(10).index
+            education_violence_top = education_violence.loc[top10_edu]
             
             # Heatmap
-            fig_esc_viol = px.imshow(
-                escolaridad_violencia_top,
+            fig_edu_viol = px.imshow(
+                education_violence_top,
                 text_auto=True,
                 aspect="auto",
                 color_continuous_scale='Purples',
-                title="Relación: Escolaridad vs Tipo de Violencia",
-                labels={'x': 'Nivel Educativo', 'y': 'Tipo de Violencia', 'color': 'Número de casos'}
+                title="Relationship: Education Level vs Type of Violence",
+                labels={'x': 'Education Level', 'y': 'Type of Violence', 'color': 'Number of cases'}
             )
-            fig_esc_viol.update_layout(width=WIDTH, height=HEIGHT)
-            st.plotly_chart(fig_esc_viol, use_container_width=False)
+            fig_edu_viol.update_layout(width=WIDTH, height=HEIGHT)
+            st.plotly_chart(fig_edu_viol, use_container_width=False)
         else:
-            st.info("No hay datos de temáticas para este análisis")
+            st.info("No topic data available for this analysis")
     
-    with c_esc2:
-        st.subheader("Análisis gráfico")
+    with c_edu2:
+        st.subheader("Graph Analysis")
         st.write("""
-        - La gráfica muestra qué tipos de violencia son más comunes según el nivel educativo.
-        - Los colores más oscuros indican mayor concentración de casos en esa combinación.
-        - Permite identificar si la violencia psicológica es más reportada por mujeres con estudios superiores.
-        - Ayuda a diseñar campañas de prevención adaptadas a cada nivel educativo.
+        - The graph shows which types of violence are most common according to education level.
+        - Darker colors indicate higher concentration of cases in that combination.
+        - Helps identify if psychological violence is more reported by women with higher education.
+        - Helps design prevention campaigns adapted to each education level.
         """)
     
-    # GRÁFICA 10: ESTADO CIVIL POR NIVEL EDUCATIVO
-    c_esc3, c_esc4 = st.columns([2,1])
+    # GRAPH 10: MARITAL STATUS BY EDUCATION LEVEL
+    c_edu3, c_edu4 = st.columns([2,1])
     
-    with c_esc3:
-        st.subheader("Estado civil por nivel educativo")
+    with c_edu3:
+        st.subheader("Marital status by education level")
         
-        if 'estado_civil' in df_exploded_esc.columns:
-            escolaridad_estado = pd.crosstab(df_exploded_esc['escolaridad'], df_exploded_esc['estado_civil'])
+        if 'estado_civil' in df_exploded_edu.columns:
+            education_marital = pd.crosstab(df_exploded_edu['escolaridad'], df_exploded_edu['estado_civil'])
             
-            fig_esc_estado = px.bar(
-                escolaridad_estado,
+            fig_edu_marital = px.bar(
+                education_marital,
                 barmode='stack',
-                title="Estado Civil por Nivel Educativo",
-                labels={'value': 'Número de casos', 'escolaridad': 'Nivel Educativo', 'variable': 'Estado Civil'},
+                title="Marital Status by Education Level",
+                labels={'value': 'Number of cases', 'escolaridad': 'Education Level', 'variable': 'Marital Status'},
                 color_discrete_sequence=px.colors.qualitative.Set3
             )
-            fig_esc_estado.update_layout(width=WIDTH, height=HEIGHT, xaxis_tickangle=45)
-            st.plotly_chart(fig_esc_estado, use_container_width=False)
+            fig_edu_marital.update_layout(width=WIDTH, height=HEIGHT, xaxis_tickangle=45)
+            st.plotly_chart(fig_edu_marital, use_container_width=False)
         else:
-            st.info("No hay datos de estado civil para este análisis")
+            st.info("No marital status data available for this analysis")
     
-    with c_esc4:
-        st.subheader("Análisis gráfico")
+    with c_edu4:
+        st.subheader("Graph Analysis")
         st.write("""
-        - La gráfica muestra la distribución de estados civiles según el nivel educativo.
-        - Permite identificar si mujeres con estudios superiores tienen diferentes patrones de estado civil.
-        - Se observa si hay mayor proporción de solteras en niveles educativos altos.
-        - Ayuda a entender el contexto socio-familiar según el nivel de estudios.
+        - The graph shows marital status distribution according to education level.
+        - Helps identify if women with higher education have different marital status patterns.
+        - Shows if there's a higher proportion of single women in higher education levels.
+        - Helps understand the socio-family context according to education level.
         """)
 
 else:
-    st.warning("No se encontró la columna 'escolaridad' en los datos")
-    st.info("Para agregar este análisis, asegúrate de que tu archivo CSV contenga la columna 'escolaridad'")
+    st.warning("Column 'escolaridad' not found in the data")
+    st.info("To add this analysis, make sure your CSV file contains the 'escolaridad' column")
 
-# ==================== CUESTIONARIO ====================
+# ==================== QUESTIONNAIRE ====================
 st.markdown("---")
-st.header("Encuesta")
-st.title("Cuéntanos qué fue lo que sucedió ese día")
-st.markdown("Responde lo más sincera posible")
+st.header("Survey")
+st.title("Tell us what happened that day")
+st.markdown("Answer as honestly as possible")
 
-with st.form(key="cuestionario_form"):
-    edad_grupo = st.selectbox(
-        "¿Qué edad tienes?",
-        ["Menor de 10", "10-15", "15-25", "25-35", "35-45", "Mayor de 45"]
+with st.form(key="questionnaire_form"):
+    age_group = st.selectbox(
+        "What is your age?",
+        ["Under 10", "10-15", "15-25", "25-35", "35-45", "Over 45"]
     )
     
-    situacion = st.selectbox(
-        "¿Has experimentado alguna situación?",
-        ["Abuso sexual", "Violencia Familiar", "Abuso de confianza", "Violación en la escuela o trabajo", "Otros"]
+    situation = st.selectbox(
+        "Have you experienced any situation?",
+        ["Sexual abuse", "Family violence", "Breach of trust", "Rape at school or work", "Other"]
     )
     
-    frecuencia = st.selectbox(
-        "¿Con qué frecuencia ocurre?",
-        ["Ocurrió una vez", "De vez en cuando", "Frecuentemente", "Me está pasando ahora"]
+    frequency = st.selectbox(
+        "How often does it happen?",
+        ["It happened once", "Occasionally", "Frequently", "It's happening to me now"]
     )
     
-    relacion = st.selectbox(
-        "Relación con la persona",
-        ["Pareja", "Familiar", "Trabajo", "Otro"]
+    relationship = st.selectbox(
+        "Relationship with the person",
+        ["Partner", "Family member", "Work", "Other"]
     )
     
-    hablado_alguien = st.selectbox(
-        "¿Has hablado con alguien?",
-        ["Sí", "No"]
+    talked_to_someone = st.selectbox(
+        "Have you talked to someone?",
+        ["Yes", "No"]
     )
     
-    submitted = st.form_submit_button("Enviar")
+    submitted = st.form_submit_button("Submit")
     
     if submitted:
-        datos_respuesta = {
-            'edad_grupo': edad_grupo,
-            'situacion': situacion,
-            'frecuencia': frecuencia,
-            'relacion': relacion,
-            'hablado_alguien': hablado_alguien
+        response_data = {
+            'age_group': age_group,
+            'situation': situation,
+            'frequency': frequency,
+            'relationship': relationship,
+            'talked_to_someone': talked_to_someone
         }
         
-        if guardar_respuesta(datos_respuesta):
-            st.success("¡Gracias por tu confianza! Tu respuesta ha sido guardada.")
+        if save_response(response_data):
+            st.success("Thank you for your trust! Your response has been saved.")
             st.balloons()
         else:
-            st.error("Hubo un error al guardar tu respuesta. Por favor, intenta de nuevo.")
+            st.error("There was an error saving your response. Please try again.")
 
-if st.button("Necesitas ayuda"):
-    st.warning("""Llama al: 800 10 84 053 o 079  Recuerda no estas sola. Puedes acudar a las siguientes sedes, no tengas miedo de hablar: 
-Secretaría de las Mujeres
+if st.button("Need help"):
+    st.warning("""Call: 800 10 84 053 or 079. Remember, you are not alone. You can go to the following locations, don't be afraid to speak:
+Women's Secretariat
 Prolongación Corregidora Sur 210, 76074 Querétaro
 442 215 3404         
-Secretaría de la Mujer del Municipio de Querétaro
+Women's Secretariat of Querétaro Municipality
 Galaxia 543, 76085 Santiago de Querétaro, Querétaro
 442 238 7700
-Secretaría Municipal de la Mujer Corregidora Querétaro
+Municipal Women's Secretariat Corregidora Querétaro
 Calle Monterrey, 76902 Corregidora, Querétaro""")
 
-df_respuestas = cargar_respuestas_cuestionario()
-if not df_respuestas.empty:
+df_responses = load_questionnaire_responses()
+if not df_responses.empty:
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### 📊 Estadísticas del Cuestionario")
-    st.sidebar.metric("Respuestas recibidas", len(df_respuestas))
-    st.sidebar.metric("Última respuesta", df_respuestas['fecha'].max().split()[0] if not df_respuestas.empty else "N/A")
+    st.sidebar.markdown("### 📊 Questionnaire Statistics")
+    st.sidebar.metric("Responses received", len(df_responses))
+    st.sidebar.metric("Last response", df_responses['timestamp'].max().split()[0] if not df_responses.empty else "N/A")
