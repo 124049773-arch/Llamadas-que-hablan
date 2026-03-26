@@ -100,8 +100,9 @@ def load_data():
                 st.stop()
             
             # AQUÍ ES DONDE SE DEFINE 'f'
-            with z.open(csv_files[0]) as f:
-                df = pd.read_csv(f, encoding="utf-8") # O "latin1" si utf-8 falla
+        # Cambiamos "utf-8" por "latin1" para que acepte acentos y eñes
+with z.open(csv_files[0]) as f:
+    df = pd.read_csv(f, encoding="latin1")
         
         # Limpiamos los nombres de las columnas
         df.columns = df.columns.str.lower().str.strip()
