@@ -55,7 +55,8 @@ def save_response(data):
         conn.commit()
         conn.close()
         return True
-    except: return False
+    except: 
+        return False
 
 def load_questionnaire_responses():
     try:
@@ -63,7 +64,8 @@ def load_questionnaire_responses():
         df = pd.read_sql_query("SELECT * FROM questionnaire_responses", conn)
         conn.close()
         return df
-    except: return pd.DataFrame()
+    except: 
+        return pd.DataFrame()
 
 init_database()
 
@@ -78,7 +80,6 @@ def load_data():
                 st.error("El ZIP no tiene un CSV adentro.")
                 st.stop()
             with z.open(csv_files[0]) as f:
-                # sep=None detecta automáticamente si el archivo usa , o ;
                 df = pd.read_csv(f, encoding="latin1", sep=',', on_bad_lines='skip')
         
         # Limpieza de nombres de columnas: quita espacios, comillas y pasa a minúsculas
@@ -93,120 +94,188 @@ def load_data():
 
 df = load_data()
 
+# DEBUG: Mostrar columnas disponibles
+with st.expander("📋 Debug - Available Columns"):
+    st.write("Columnas disponibles en el CSV:")
+    st.write(df.columns.tolist())
+
 # ==================== FILTERS ====================
 st.sidebar.header("Filters")
 
-# Filtros usando los nombres limpios
-available_states = df['estado_usuaria'].unique()
-state = st.sidebar.multiselect("Select State:", options=available_states, 
-                               default=available_states[:3] if len(available_states) > 3 else available_states)
+# Función auxiliar para manejar columnas faltantes
+def safe_multiselect(column_name, label, default_count=3):
+    """Función segura para crear filtros multi-select"""
+    if column_name not in df.columns:
+        st.sidebar.warning(f"⚠️ Columna '{column_name}' no encontrada")
+        return None
+    
+    unique_values = df[column_name].dropna().unique()
+    if len(unique_values) == 0:
+        st.sidebar.warning(f"⚠️ La columna '{column_name}' está vacía")
+        return None
+    
+    defaults = unique_values[:default_count] if len(unique_values) > default_count else unique_values
+    return st.sidebar.multiselect(label, options=unique_values, default=defaults)
 
-filtered_df_state = df[df['estado_usuaria'].isin(state)] if state else df
+# Intentar cargar estados y municipios
+selected_state = safe_multiselect('estado_usuaria', "Select State:", 3)
+if selected_state:
+    filtered_df_state = df[df['estado_usuaria'].isin(selected_state)]
+else:
+    filtered_df_state = df
+    st.sidebar.info("Usando todos los datos (columna 'estado_usuaria' no disponible)")
 
-available_municipalities = filtered_df_state['municipio_usuaria'].unique()
-municipality = st.sidebar.multiselect("Select Municipality:", options=available_municipalities,
-                                      default=available_municipalities[:5] if len(available_municipalities) > 5 else available_municipalities)
+selected_municipality = safe_multiselect('municipio_usuaria', "Select Municipality:", 5)
+if selected_municipality:
+    df_selection = filtered_df_state[filtered_df_state['municipio_usuaria'].isin(selected_municipality)]
+else:
+    df_selection = filtered_df_state
+    st.sidebar.info("Usando todos los datos (columna 'municipio_usuaria' no disponible)")
 
-df_selection = filtered_df_state[filtered_df_state['municipio_usuaria'].isin(municipality)] if municipality else filtered_df_state
-
-# Metrics
+# ==================== METRICS ====================
 col1, col2, col3 = st.columns(3)
 col1.metric("Total Reports", f"{len(df_selection):,}")
-avg_age = pd.to_numeric(df_selection['edad'], errors='coerce').mean()
-col2.metric("Average Age", f"{avg_age:.0f}" if not pd.isna(avg_age) else "N/A")
-col3.metric("Municipalities", f"{len(municipality) if municipality else len(df_selection['municipio_usuaria'].unique())}")
+
+# Métrica de edad segura
+if 'edad' in df_selection.columns:
+    avg_age = pd.to_numeric(df_selection['edad'], errors='coerce').mean()
+    col2.metric("Average Age", f"{avg_age:.0f}" if not pd.isna(avg_age) else "N/A")
+else:
+    col2.metric("Average Age", "N/A")
+
+# Métrica de municipios segura
+if 'municipio_usuaria' in df_selection.columns:
+    municipios_count = len(df_selection['municipio_usuaria'].unique())
+    col3.metric("Municipalities", f"{municipios_count}")
+else:
+    col3.metric("Municipalities", "N/A")
 
 # ==================== GRAPHS AND ANALYSES ====================
 
-# GRAPH 1
-c1, c2 = st.columns([2,1])
-with c1:
-    st.subheader("Distribution by Occupation")
-    fig_occ = px.pie(df_selection, names='ocupacion', hole=0.6, color_discrete_sequence=["#E6CCFF","#D8B4FE","#C084FC","#A855F7","#9333EA","#7E22CE"])
-    fig_occ.update_layout(width=WIDTH, height=HEIGHT)
-    st.plotly_chart(fig_occ)
-with c2:
-    st.subheader("Graph Analysis")
-    st.write("""
-    - The graph shows the distribution of occupations of users who made calls.
-    - It shows which occupational groups have the highest presence in reports.
-    - Larger portions indicate labor sectors with more cases.
-    - This helps focus prevention campaigns on specific sectors.
-    """)
+# GRAPH 1: Distribution by Occupation
+if 'ocupacion' in df_selection.columns:
+    c1, c2 = st.columns([2,1])
+    with c1:
+        st.subheader("Distribution by Occupation")
+        ocupacion_counts = df_selection['ocupacion'].value_counts().head(10)
+        if len(ocupacion_counts) > 0:
+            fig_occ = px.pie(df_selection, names='ocupacion', hole=0.6, 
+                           color_discrete_sequence=["#E6CCFF","#D8B4FE","#C084FC","#A855F7","#9333EA","#7E22CE"])
+            fig_occ.update_layout(width=WIDTH, height=HEIGHT)
+            st.plotly_chart(fig_occ)
+        else:
+            st.info("No hay datos disponibles para esta visualización")
+    with c2:
+        st.subheader("Graph Analysis")
+        st.write("""
+        - The graph shows the distribution of occupations of users who made calls.
+        - It shows which occupational groups have the highest presence in reports.
+        - Larger portions indicate labor sectors with more cases.
+        - This helps focus prevention campaigns on specific sectors.
+        """)
+else:
+    st.warning("⚠️ Columna 'ocupacion' no disponible")
 
-# GRAPH 2
-c3, c4 = st.columns([2,1])
-with c3:
-    st.subheader("Attentions by Month")
-    month_counts = df_selection['mes_alta'].value_counts().reset_index()
-    month_counts.columns = ['month', 'total']
-    fig_month = px.bar(month_counts.sort_values(by='month'), x='month', y='total', color_discrete_sequence=['#9333EA'])
-    fig_month.update_layout(width=WIDTH, height=HEIGHT)
-    st.plotly_chart(fig_month)
-with c4:
-    st.subheader("Graph Analysis")
-    st.write("""
-    - The graph shows call distribution for each month of the year.
-    - Identifies months with the highest and lowest number of reports.
-    - Highest peaks indicate times of greatest demand for attention.
-    - Helps plan resources according to seasonal demand.
-    """)
+# GRAPH 2: Attentions by Month
+if 'mes_alta' in df_selection.columns:
+    c3, c4 = st.columns([2,1])
+    with c3:
+        st.subheader("Attentions by Month")
+        month_counts = df_selection['mes_alta'].value_counts().reset_index()
+        month_counts.columns = ['month', 'total']
+        if len(month_counts) > 0:
+            fig_month = px.bar(month_counts.sort_values(by='month'), x='month', y='total', 
+                             color_discrete_sequence=['#9333EA'])
+            fig_month.update_layout(width=WIDTH, height=HEIGHT)
+            st.plotly_chart(fig_month)
+        else:
+            st.info("No hay datos disponibles para esta visualización")
+    with c4:
+        st.subheader("Graph Analysis")
+        st.write("""
+        - The graph shows call distribution for each month of the year.
+        - Identifies months with the highest and lowest number of reports.
+        - Highest peaks indicate times of greatest demand for attention.
+        - Helps plan resources according to seasonal demand.
+        """)
+else:
+    st.warning("⚠️ Columna 'mes_alta' no disponible")
 
-# GRAPH 3
-c5, c6 = st.columns([2,1])
-with c5:
-    st.subheader("Age Distribution")
-    bins = st.slider("Number of intervals (bins)", 5, 50, 20, key="age_bins")
-    fig_age = px.histogram(df_selection, x="edad", nbins=bins, color_discrete_sequence=['#FFA200'])
-    fig_age.update_layout(width=WIDTH, height=HEIGHT)
-    st.plotly_chart(fig_age)
-with c6:
-    st.subheader("Graph Analysis")
-    st.write("""
-    - The graph shows the age concentration of users who report.
-    - Most people are concentrated between 30 and 50 years old.
-    - There are fewer cases among very young and very old ages.
-    - The strongest core is in middle ages, extremes are rare.
-    """)
+# GRAPH 3: Age Distribution
+if 'edad' in df_selection.columns:
+    c5, c6 = st.columns([2,1])
+    with c5:
+        st.subheader("Age Distribution")
+        bins = st.slider("Number of intervals (bins)", 5, 50, 20, key="age_bins")
+        edad_numeric = pd.to_numeric(df_selection['edad'], errors='coerce').dropna()
+        if len(edad_numeric) > 0:
+            fig_age = px.histogram(df_selection, x="edad", nbins=bins, 
+                                 color_discrete_sequence=['#FFA200'])
+            fig_age.update_layout(width=WIDTH, height=HEIGHT)
+            st.plotly_chart(fig_age)
+        else:
+            st.info("No hay datos numéricos para esta visualización")
+    with c6:
+        st.subheader("Graph Analysis")
+        st.write("""
+        - The graph shows the age concentration of users who report.
+        - Most people are concentrated between 30 and 50 years old.
+        - There are fewer cases among very young and very old ages.
+        - The strongest core is in middle ages, extremes are rare.
+        """)
+else:
+    st.warning("⚠️ Columna 'edad' no disponible")
 
-# GRAPH 4
-c7, c8 = st.columns([2,1])
-with c7:
-    if 'estado_civil' in df_selection.columns:
+# GRAPH 4: Frequency by Marital Status
+if 'estado_civil' in df_selection.columns:
+    c7, c8 = st.columns([2,1])
+    with c7:
         st.subheader("Frequency by marital status")
         count_ms = df_selection['estado_civil'].value_counts().reset_index()
-        fig_ms = px.bar(count_ms, x='index', y='estado_civil', color_discrete_sequence=["#9333EA"])
-        fig_ms.update_layout(width=WIDTH, height=HEIGHT)
-        st.plotly_chart(fig_ms)
-with c8:
-    st.subheader("Graph Analysis")
-    st.write("""
-    - The graph shows distribution by marital status of women who report.
-    - Most are single women with around 250,000 records.
-    - Followed by married women with approximately 150,000 cases.
-    - Those in common-law relationships have about 50,000 registered cases.
-    """)
+        if len(count_ms) > 0:
+            fig_ms = px.bar(count_ms, x='index', y='estado_civil', 
+                          color_discrete_sequence=["#9333EA"])
+            fig_ms.update_layout(width=WIDTH, height=HEIGHT)
+            st.plotly_chart(fig_ms)
+        else:
+            st.info("No hay datos disponibles para esta visualización")
+    with c8:
+        st.subheader("Graph Analysis")
+        st.write("""
+        - The graph shows distribution by marital status of women who report.
+        - Most are single women with around 250,000 records.
+        - Followed by married women with approximately 150,000 cases.
+        - Those in common-law relationships have about 50,000 registered cases.
+        """)
+else:
+    st.info("ℹ️ Columna 'estado_civil' no disponible")
 
-# GRAPH 5
-c9, c10 = st.columns([2,1])
-with c9:
-    st.subheader("Monthly call evolution")
-    df_temp = df_selection.copy()
-    df_temp['fecha_alta'] = pd.to_datetime(df_temp['fecha_alta'], errors='coerce')
-    df_temp = df_temp.dropna(subset=['fecha_alta'])
-    df_temp['year_month'] = df_temp['fecha_alta'].dt.to_period('M').astype(str)
-    calls_per_month = df_temp.groupby('year_month').size().reset_index(name='total')
-    fig_ev = px.line(calls_per_month, x='year_month', y='total', markers=True)
-    fig_ev.update_layout(width=WIDTH, height=HEIGHT)
-    st.plotly_chart(fig_ev)
-with c10:
-    st.subheader("Graph Analysis")
-    st.write("""
-    - The graph shows call evolution over time.
-    - An initial increase is observed, then they remained with ups and downs.
-    - Finally, a significant decrease is seen in recent periods.
-    - Helps identify trends and evaluate intervention impact.
-    """)
+# GRAPH 5: Monthly call evolution
+if 'fecha_alta' in df_selection.columns:
+    c9, c10 = st.columns([2,1])
+    with c9:
+        st.subheader("Monthly call evolution")
+        df_temp = df_selection.copy()
+        df_temp['fecha_alta'] = pd.to_datetime(df_temp['fecha_alta'], errors='coerce')
+        df_temp = df_temp.dropna(subset=['fecha_alta'])
+        if len(df_temp) > 0:
+            df_temp['year_month'] = df_temp['fecha_alta'].dt.to_period('M').astype(str)
+            calls_per_month = df_temp.groupby('year_month').size().reset_index(name='total')
+            fig_ev = px.line(calls_per_month, x='year_month', y='total', markers=True)
+            fig_ev.update_layout(width=WIDTH, height=HEIGHT)
+            st.plotly_chart(fig_ev)
+        else:
+            st.info("No hay fechas válidas para esta visualización")
+    with c10:
+        st.subheader("Graph Analysis")
+        st.write("""
+        - The graph shows call evolution over time.
+        - An initial increase is observed, then they remained with ups and downs.
+        - Finally, a significant decrease is seen in recent periods.
+        - Helps identify trends and evaluate intervention impact.
+        """)
+else:
+    st.warning("⚠️ Columna 'fecha_alta' no disponible")
 
 # TOPIC ANALYSIS
 st.header("Topic Analysis")
@@ -214,10 +283,16 @@ topic_cols = ['tematica_1', 'tematica_2', 'tematica_3', 'tematica_4', 'tematica_
 existing_topics = [c for c in topic_cols if c in df_selection.columns]
 if existing_topics:
     df_exploded = df_selection.melt(value_vars=existing_topics, value_name='topic').dropna()
-    top_15 = df_exploded['topic'].value_counts().head(15)
-    fig_topics = px.bar(x=top_15.values, y=top_15.index, orientation='h', color_continuous_scale='Purples_r')
-    fig_topics.update_layout(width=WIDTH, height=HEIGHT, yaxis=dict(autorange="reversed"))
-    st.plotly_chart(fig_topics)
+    if len(df_exploded) > 0:
+        top_15 = df_exploded['topic'].value_counts().head(15)
+        fig_topics = px.bar(x=top_15.values, y=top_15.index, orientation='h', 
+                          color_continuous_scale='Purples_r')
+        fig_topics.update_layout(width=WIDTH, height=HEIGHT, yaxis=dict(autorange="reversed"))
+        st.plotly_chart(fig_topics)
+    else:
+        st.info("No hay datos de temas disponibles")
+else:
+    st.info("ℹ️ No hay columnas de temas disponibles en los datos")
 
 # ==================== SURVEY AND CONTACT ====================
 st.markdown("---")
@@ -230,24 +305,5 @@ with st.form("survey_form"):
     sit_q = st.selectbox("Have you experienced any situation?", ["Sexual abuse", "Family violence", "Breach of trust", "Rape at school or work", "Other"])
     freq_q = st.selectbox("How often does it happen?", ["It happened once", "Occasionally", "Frequently", "It's happening to me now"])
     rel_q = st.selectbox("Relationship with the person", ["Partner", "Family member", "Work", "Other"])
-    talk_q = st.selectbox("Have you talked to someone?", ["Yes", "No"])
-    if st.form_submit_button("Submit"):
-        if save_response({'age_group':age_q, 'situation':sit_q, 'frequency':freq_q, 'relationship':rel_q, 'talked_to_someone':talk_q}):
-            st.success("Thank you for your trust! Your response has been saved.")
-            st.balloons()
-
-if st.button("Need help"):
-    st.warning("""Call: 800 10 84 053 or 079. Remember, you are not alone. You can go to the following locations, don't be afraid to speak:
-Women's Secretariat
-Prolongación Corregidora Sur 210, 76074 Querétaro
-442 215 3404          
-Women's Secretariat of Querétaro Municipality
-Galaxia 543, 76085 Santiago de Querétaro, Querétaro
-442 238 7700
-Municipal Women's Secretariat Corregidora Querétaro
-Calle Monterrey, 76902 Corregidora, Querétaro""")
-
-df_res = load_questionnaire_responses()
-if not df_res.empty:
-    st.sidebar.markdown("---")
-    st.sidebar.metric("Responses received", len(df_res))
+    talk_q = st.selectbox("Have*
+
