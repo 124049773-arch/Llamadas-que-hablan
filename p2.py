@@ -89,21 +89,15 @@ init_database()
 
 @st.cache_data
 def load_data():
-    zip_path = "linea-mujeres-cdm.zip"
+    zip_path = "linea-mujeres-cdmx.zip" # Asegúrate que este nombre sea IGUAL al archivo subido
     try:
         with zipfile.ZipFile(zip_path, 'r') as z:
-            # Listamos todos los archivos dentro del zip
-            todos_los_archivos = z.namelist()
-            # Buscamos el que termine en .csv
-            csv_files = [f for f in todos_los_archivos if f.lower().endswith('.csv')]
-            
+            csv_files = [f for f in z.namelist() if f.lower().endswith('.csv')]
             if not csv_files:
-                st.error("El archivo ZIP no contiene ningún archivo .csv")
+                st.error("El ZIP no tiene un CSV adentro.")
                 st.stop()
-                
             with z.open(csv_files[0]) as f:
                 df = pd.read_csv(f, encoding="latin1")
-        
         df.columns = df.columns.str.lower().str.strip()
         return df
     except Exception as e:
