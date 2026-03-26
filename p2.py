@@ -7,8 +7,7 @@ import sqlite3
 from datetime import datetime
 import plotly.graph_objects as go
 import numpy as np
-import zipfile  # Necesario para leer el zip
-
+import zipfile
 
 WIDTH = 650
 HEIGHT = 450
@@ -34,60 +33,41 @@ st.markdown("Dynamic visualization of care reports.")
 
 # ==================== DATABASE CONFIGURATION ====================
 def init_database():
-    """Initializes the SQLite database"""
     conn = sqlite3.connect('questionnaire_women.db')
     c = conn.cursor()
-    
     c.execute('''CREATE TABLE IF NOT EXISTS questionnaire_responses (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp TIMESTAMP,
-        age_group TEXT,
-        situation TEXT,
-        frequency TEXT,
-        relationship TEXT,
-        talked_to_someone TEXT
+        timestamp TIMESTAMP, age_group TEXT, situation TEXT, 
+        frequency TEXT, relationship TEXT, talked_to_someone TEXT
     )''')
-    
     conn.commit()
     conn.close()
 
 def save_response(data):
-    """Saves questionnaire responses to the database"""
     try:
         conn = sqlite3.connect('questionnaire_women.db')
         c = conn.cursor()
-        
         c.execute('''INSERT INTO questionnaire_responses 
                     (timestamp, age_group, situation, frequency, relationship, talked_to_someone)
                     VALUES (?, ?, ?, ?, ?, ?)''',
-                  (datetime.now(), 
-                   data['age_group'],
-                   data['situation'],
-                   data['frequency'],
-                   data['relationship'],
-                   data['talked_to_someone']))
-        
+                  (datetime.now(), data['age_group'], data['situation'], 
+                   data['frequency'], data['relationship'], data['talked_to_someone']))
         conn.commit()
         conn.close()
         return True
-    except Exception as e:
-        st.error(f"Error saving: {e}")
-        return False
+    except: return False
 
 def load_questionnaire_responses():
-    """Loads questionnaire responses for analysis"""
     try:
         conn = sqlite3.connect('questionnaire_women.db')
         df = pd.read_sql_query("SELECT * FROM questionnaire_responses", conn)
         conn.close()
         return df
-    except:
-        return pd.DataFrame()
+    except: return pd.DataFrame()
 
-# Initialize database
 init_database()
-# ==================== END DATABASE CONFIGURATION ====================
 
+# ==================== LOAD DATA CORREGIDO ====================
 @st.cache_data
 def load_data():
     zip_path = "linea-mujeres-cdmx.zip" 
@@ -97,18 +77,15 @@ def load_data():
             if not csv_files:
                 st.error("El ZIP no tiene un CSV adentro.")
                 st.stop()
-            
             with z.open(csv_files[0]) as f:
-                # Detecta automáticamente si usa , o ; y acepta acentos con latin1
+                # sep=None detecta automáticamente si el archivo usa , o ;
                 df = pd.read_csv(f, encoding="latin1", sep=None, engine='python', on_bad_lines='skip')
         
-        # LIMPIEZA DE COLUMNAS: Elimina espacios, comillas y pasa a minúsculas
+        # Limpieza de nombres de columnas: quita espacios, comillas y pasa a minúsculas
         df.columns = [str(c).lower().strip().replace('"', '').replace("'", "") for c in df.columns]
         
-        # Limpieza de datos numéricos
         if 'edad' in df.columns:
             df['edad'] = pd.to_numeric(df['edad'], errors='coerce')
-        
         return df
     except Exception as e:
         st.error(f"Error crítico al leer los datos: {e}")
@@ -119,50 +96,35 @@ df = load_data()
 # ==================== FILTERS ====================
 st.sidebar.header("Filters")
 
-# Filter by State
+# Filtros usando los nombres limpios
 available_states = df['estado_usuaria'].unique()
-state = st.sidebar.multiselect(
-    "Select State:",
-    options=available_states,
-    default=available_states[:3] if len(available_states) > 3 else available_states
-)
+state = st.sidebar.multiselect("Select State:", options=available_states, 
+                               default=available_states[:3] if len(available_states) > 3 else available_states)
 
-# Filter by state first
-if state:
-    filtered_df_state = df[df['estado_usuaria'].isin(state)]
-else:
-    filtered_df_state = df
+filtered_df_state = df[df['estado_usuaria'].isin(state)] if state else df
 
-# Filter by Municipality
 available_municipalities = filtered_df_state['municipio_usuaria'].unique()
-municipality = st.sidebar.multiselect(
-    "Select Municipality:",
-    options=available_municipalities,
-    default=available_municipalities[:5] if len(available_municipalities) > 5 else available_municipalities
-)
+municipality = st.sidebar.multiselect("Select Municipality:", options=available_municipalities,
+                                      default=available_municipalities[:5] if len(available_municipalities) > 5 else available_municipalities)
 
-# Apply municipality filter
-if municipality:
-    df_selection = filtered_df_state[filtered_df_state['municipio_usuaria'].isin(municipality)]
-else:
-    df_selection = filtered_df_state
+df_selection = filtered_df_state[filtered_df_state['municipio_usuaria'].isin(municipality)] if municipality else filtered_df_state
 
+# Metrics
 col1, col2, col3 = st.columns(3)
 col1.metric("Total Reports", f"{len(df_selection):,}")
 avg_age = pd.to_numeric(df_selection['edad'], errors='coerce').mean()
 col2.metric("Average Age", f"{avg_age:.0f}" if not pd.isna(avg_age) else "N/A")
 col3.metric("Municipalities", f"{len(municipality) if municipality else len(df_selection['municipio_usuaria'].unique())}")
 
-# ==================== GRAPH 1: DISTRIBUTION BY OCCUPATION ====================
-c1, c2 = st.columns([2,1])
+# ==================== GRAPHS AND ANALYSES ====================
 
+# GRAPH 1
+c1, c2 = st.columns([2,1])
 with c1:
     st.subheader("Distribution by Occupation")
-    fig_occupation = px.pie(df_selection, names='ocupacion', hole=0.6,
-        color_discrete_sequence=["#E6CCFF","#D8B4FE","#C084FC","#A855F7","#9333EA","#7E22CE"])
-    fig_occupation.update_layout(width=WIDTH, height=HEIGHT)
-    st.plotly_chart(fig_occupation, use_container_width=False)
-
+    fig_occ = px.pie(df_selection, names='ocupacion', hole=0.6, color_discrete_sequence=["#E6CCFF","#D8B4FE","#C084FC","#A855F7","#9333EA","#7E22CE"])
+    fig_occ.update_layout(width=WIDTH, height=HEIGHT)
+    st.plotly_chart(fig_occ)
 with c2:
     st.subheader("Graph Analysis")
     st.write("""
@@ -172,19 +134,15 @@ with c2:
     - This helps focus prevention campaigns on specific sectors.
     """)
 
-# ==================== GRAPH 2: ATTENTIONS BY MONTH ====================
+# GRAPH 2
 c3, c4 = st.columns([2,1])
-
 with c3:
     st.subheader("Attentions by Month")
     month_counts = df_selection['mes_alta'].value_counts().reset_index()
     month_counts.columns = ['month', 'total']
-    fig_month = px.bar(month_counts.sort_values(by='month'), x='month', y='total',
-        labels={'month': 'Month of the Year', 'total': 'Number of calls'},
-        color_discrete_sequence=['#9333EA'])
+    fig_month = px.bar(month_counts.sort_values(by='month'), x='month', y='total', color_discrete_sequence=['#9333EA'])
     fig_month.update_layout(width=WIDTH, height=HEIGHT)
-    st.plotly_chart(fig_month, use_container_width=False)
-
+    st.plotly_chart(fig_month)
 with c4:
     st.subheader("Graph Analysis")
     st.write("""
@@ -194,17 +152,14 @@ with c4:
     - Helps plan resources according to seasonal demand.
     """)
 
-# ==================== GRAPH 3: AGE DISTRIBUTION ====================
+# GRAPH 3
 c5, c6 = st.columns([2,1])
-
 with c5:
     st.subheader("Age Distribution")
     bins = st.slider("Number of intervals (bins)", 5, 50, 20, key="age_bins")
-    fig_age = px.histogram(df_selection, x="edad", nbins=bins,
-        title="Age Distribution of Users", color_discrete_sequence=['#FFA200'])
+    fig_age = px.histogram(df_selection, x="edad", nbins=bins, color_discrete_sequence=['#FFA200'])
     fig_age.update_layout(width=WIDTH, height=HEIGHT)
-    st.plotly_chart(fig_age, use_container_width=False)
-
+    st.plotly_chart(fig_age)
 with c6:
     st.subheader("Graph Analysis")
     st.write("""
@@ -214,18 +169,15 @@ with c6:
     - The strongest core is in middle ages, extremes are rare.
     """)
 
-# ==================== GRAPH 4: FREQUENCY BY MARITAL STATUS ====================
+# GRAPH 4
 c7, c8 = st.columns([2,1])
-
 with c7:
-    if 'estado_civil' in df.columns:
+    if 'estado_civil' in df_selection.columns:
         st.subheader("Frequency by marital status")
-        count_ms = df['estado_civil'].value_counts().reset_index()
-        count_ms.columns = ['marital_status', 'total']
-        fig_ms = px.bar(count_ms, x='marital_status', y='total', color_discrete_sequence=["#9333EA"])
-        fig_ms.update_layout(width=WIDTH, height=HEIGHT, xaxis_tickangle=45)
-        st.plotly_chart(fig_ms, use_container_width=False)
-
+        count_ms = df_selection['estado_civil'].value_counts().reset_index()
+        fig_ms = px.bar(count_ms, x='index', y='estado_civil', color_discrete_sequence=["#9333EA"])
+        fig_ms.update_layout(width=WIDTH, height=HEIGHT)
+        st.plotly_chart(fig_ms)
 with c8:
     st.subheader("Graph Analysis")
     st.write("""
@@ -235,21 +187,18 @@ with c8:
     - Those in common-law relationships have about 50,000 registered cases.
     """)
 
-# ==================== GRAPH 5: MONTHLY CALL EVOLUTION ====================
+# GRAPH 5
 c9, c10 = st.columns([2,1])
-
 with c9:
     st.subheader("Monthly call evolution")
-    df_temp = df.copy()
+    df_temp = df_selection.copy()
     df_temp['fecha_alta'] = pd.to_datetime(df_temp['fecha_alta'], errors='coerce')
     df_temp = df_temp.dropna(subset=['fecha_alta'])
     df_temp['year_month'] = df_temp['fecha_alta'].dt.to_period('M').astype(str)
-    calls_per_month = df_temp.groupby('year_month').size().reset_index()
-    calls_per_month.columns = ['year_month', 'total']
+    calls_per_month = df_temp.groupby('year_month').size().reset_index(name='total')
     fig_ev = px.line(calls_per_month, x='year_month', y='total', markers=True)
-    fig_ev.update_layout(width=WIDTH, height=HEIGHT, xaxis_tickangle=90)
-    st.plotly_chart(fig_ev, use_container_width=False)
-
+    fig_ev.update_layout(width=WIDTH, height=HEIGHT)
+    st.plotly_chart(fig_ev)
 with c10:
     st.subheader("Graph Analysis")
     st.write("""
@@ -259,261 +208,33 @@ with c10:
     - Helps identify trends and evaluate intervention impact.
     """)
 
-# ==================== GRAPH 6: CLUSTERS AGE VS SERVICE ====================
-c11, c12 = st.columns([2,1])
-
-with c11:
-    st.subheader("Call clusters (Age vs Service)")
-    df_num = df.select_dtypes(include=['int64','float64']).fillna(df.median(numeric_only=True))
-    scaler = StandardScaler()
-    scaled_data = scaler.fit_transform(df_num)
-    kmeans = KMeans(n_clusters=3, random_state=42)
-    df['cluster'] = kmeans.fit_predict(scaled_data)
-    if 'edad' in df.columns and 'servicio' in df.columns:
-        fig_cl = px.scatter(df, x='edad', y='servicio', color='cluster', color_continuous_scale='viridis')
-        fig_cl.update_layout(width=WIDTH, height=HEIGHT)
-        st.plotly_chart(fig_cl, use_container_width=False)
-
-with c12:
-    st.subheader("Graph Analysis")
-    st.write("""
-    - The horizontal axis indicates the age of women who called.
-    - The vertical axis indicates the type of counseling required.
-    - Points represent calls and color indicates which age group they belong to.
-    - Helps identify service patterns according to age ranges.
-    """)
-
-# ==================== TOPIC ANALYSIS ====================
+# TOPIC ANALYSIS
 st.header("Topic Analysis")
-
-# Prepare topic data
-topic_columns = ['tematica_1', 'tematica_2', 'tematica_3', 'tematica_4', 'tematica_5', 'tematica_6', 'tematica_7']
-existing_topics = [col for col in topic_columns if col in df.columns]
-
+topic_cols = ['tematica_1', 'tematica_2', 'tematica_3', 'tematica_4', 'tematica_5', 'tematica_6', 'tematica_7']
+existing_topics = [c for c in topic_cols if c in df_selection.columns]
 if existing_topics:
-    # Create expanded version for analysis
-    df_temp = df_selection.copy()
-    for col in existing_topics:
-        df_temp[col] = df_temp[col].fillna('Not specified')
-    
-    df_temp['topics_list'] = df_temp[existing_topics].apply(lambda x: x.tolist(), axis=1)
-    df_exploded = df_temp.explode('topics_list')
-    df_exploded = df_exploded[df_exploded['topics_list'] != 'Not specified']
-    df_exploded = df_exploded.rename(columns={'topics_list': 'topic'})
-    
-    # Create age groups
-    df_exploded['edad'] = pd.to_numeric(df_exploded['edad'], errors='coerce')
-    df_exploded['age_group'] = pd.cut(
-        df_exploded['edad'],
-        bins=[0, 18, 25, 35, 45, 100],
-        labels=['<18 years', '18-25 years', '26-35 years', '36-45 years', '>45 years']
-    )
-    
-    # GRAPH 7: TOP 15 MOST REPORTED TOPICS
-    c_topic1, c_topic2 = st.columns([2,1])
-    
-    with c_topic1:
-        st.subheader("Top 15 most reported topics")
-        
-        top_topics = df_exploded['topic'].value_counts().head(15)
-        
-        fig_top_topics = px.bar(
-            x=top_topics.values, 
-            y=top_topics.index,
-            orientation='h',
-            labels={'x': 'Number of cases', 'y': 'Topic'},
-            color=top_topics.values,
-            color_continuous_scale='Purples_r'
-        )
-        fig_top_topics.update_layout(width=WIDTH, height=HEIGHT, yaxis=dict(autorange="reversed"))
-        st.plotly_chart(fig_top_topics, use_container_width=False)
-    
-    with c_topic2:
-        st.subheader("Graph Analysis")
-        st.write("""
-        - The graph shows the 15 most frequent problems reported by users.
-        - Longer bars with darker purple color represent the most common problems.
-        - A clear concentration is observed in the first 3-4 topics, indicating priority problems.
-        - The topic with the highest number of cases should be the main focus of support programs.
-        """)
-    
-    # GRAPH 8: TOPIC DISTRIBUTION BY AGE GROUP
-    c_topic3, c_topic4 = st.columns([2,1])
-    
-    with c_topic3:
-        st.subheader("Topic distribution by age group")
-        
-        # Select top 8 topics
-        top8 = df_exploded['topic'].value_counts().head(8).index
-        df_top8 = df_exploded[df_exploded['topic'].isin(top8)]
-        
-        # Create contingency table
-        age_topic = pd.crosstab(df_top8['topic'], df_top8['age_group'])
-        
-        # Purple colors for age groups
-        purple_colors = ['#4A0E4E', '#6B2E6B', '#8B4B8B', '#AA6EAA', '#C999C9']
-        
-        fig_topic_age = px.bar(
-            age_topic,
-            labels={'value': 'Number of cases', 'topic': 'Topic', 'variable': 'Age Group'},
-            color_discrete_sequence=purple_colors,
-            barmode='stack'
-        )
-        fig_topic_age.update_layout(width=WIDTH, height=HEIGHT, xaxis_tickangle=45)
-        st.plotly_chart(fig_topic_age, use_container_width=False)
-    
-    with c_topic4:
-        st.subheader("Graph Analysis")
-        st.write("""
-        - The graph shows how problems are distributed according to user age.
-        - The darkest purple color (#4A0E4E) represents the youngest group (<18 years).
-        - The lightest purple color (#C999C9) represents the oldest group (>45 years).
-        - Shows which problems affect younger women more and which affect older women.
-        - Balanced colors indicate problems affecting all ages.
-        """)
+    df_exploded = df_selection.melt(value_vars=existing_topics, value_name='topic').dropna()
+    top_15 = df_exploded['topic'].value_counts().head(15)
+    fig_topics = px.bar(x=top_15.values, y=top_15.index, orientation='h', color_continuous_scale='Purples_r')
+    fig_topics.update_layout(width=WIDTH, height=HEIGHT, yaxis=dict(autorange="reversed"))
+    st.plotly_chart(fig_topics)
 
-else:
-    st.warning("No topic columns found in the data")
-
-# ==================== EDUCATION LEVEL ANALYSIS ====================
-st.header("Education Level Analysis")
-
-if 'escolaridad' in df.columns:
-    # Prepare topic data for education analysis
-    topic_columns = ['tematica_1', 'tematica_2', 'tematica_3', 'tematica_4', 'tematica_5', 'tematica_6', 'tematica_7']
-    existing_topics_edu = [col for col in topic_columns if col in df.columns]
-    
-    if existing_topics_edu:
-        df_temp_edu = df_selection.copy()
-        for col in existing_topics_edu:
-            df_temp_edu[col] = df_temp_edu[col].fillna('Not specified')
-        
-        df_temp_edu['topics_list'] = df_temp_edu[existing_topics_edu].apply(lambda x: x.tolist(), axis=1)
-        df_exploded_edu = df_temp_edu.explode('topics_list')
-        df_exploded_edu = df_exploded_edu[df_exploded_edu['topics_list'] != 'Not specified']
-        df_exploded_edu = df_exploded_edu.rename(columns={'topics_list': 'topic'})
-    else:
-        df_exploded_edu = df_selection.copy()
-    
-    # GRAPH 9: EDUCATION LEVEL VS TYPE OF VIOLENCE
-    c_edu1, c_edu2 = st.columns([2,1])
-    
-    with c_edu1:
-        st.subheader("Education Level vs Type of Violence")
-        
-        if 'topic' in df_exploded_edu.columns:
-            # Create contingency table
-            education_violence = pd.crosstab(df_exploded_edu['topic'], df_exploded_edu['escolaridad'])
-            
-            # Select top 10 topics
-            top10_edu = education_violence.sum(axis=1).sort_values(ascending=False).head(10).index
-            education_violence_top = education_violence.loc[top10_edu]
-            
-            # Heatmap
-            fig_edu_viol = px.imshow(
-                education_violence_top,
-                text_auto=True,
-                aspect="auto",
-                color_continuous_scale='Purples',
-                title="Relationship: Education Level vs Type of Violence",
-                labels={'x': 'Education Level', 'y': 'Type of Violence', 'color': 'Number of cases'}
-            )
-            fig_edu_viol.update_layout(width=WIDTH, height=HEIGHT)
-            st.plotly_chart(fig_edu_viol, use_container_width=False)
-        else:
-            st.info("No topic data available for this analysis")
-    
-    with c_edu2:
-        st.subheader("Graph Analysis")
-        st.write("""
-        - The graph shows which types of violence are most common according to education level.
-        - Darker colors indicate higher concentration of cases in that combination.
-        - Helps identify if psychological violence is more reported by women with higher education.
-        - Helps design prevention campaigns adapted to each education level.
-        """)
-    
-    # GRAPH 10: MARITAL STATUS BY EDUCATION LEVEL
-    c_edu3, c_edu4 = st.columns([2,1])
-    
-    with c_edu3:
-        st.subheader("Marital status by education level")
-        
-        if 'estado_civil' in df_exploded_edu.columns:
-            education_marital = pd.crosstab(df_exploded_edu['escolaridad'], df_exploded_edu['estado_civil'])
-            
-            fig_edu_marital = px.bar(
-                education_marital,
-                barmode='stack',
-                title="Marital Status by Education Level",
-                labels={'value': 'Number of cases', 'escolaridad': 'Education Level', 'variable': 'Marital Status'},
-                color_discrete_sequence=px.colors.qualitative.Set3
-            )
-            fig_edu_marital.update_layout(width=WIDTH, height=HEIGHT, xaxis_tickangle=45)
-            st.plotly_chart(fig_edu_marital, use_container_width=False)
-        else:
-            st.info("No marital status data available for this analysis")
-    
-    with c_edu4:
-        st.subheader("Graph Analysis")
-        st.write("""
-        - The graph shows marital status distribution according to education level.
-        - Helps identify if women with higher education have different marital status patterns.
-        - Shows if there's a higher proportion of single women in higher education levels.
-        - Helps understand the socio-family context according to education level.
-        """)
-
-else:
-    st.warning("Column 'escolaridad' not found in the data")
-    st.info("To add this analysis, make sure your CSV file contains the 'escolaridad' column")
-
-# ==================== QUESTIONNAIRE ====================
+# ==================== SURVEY AND CONTACT ====================
 st.markdown("---")
 st.header("Survey")
 st.title("Tell us what happened that day")
 st.markdown("Answer as honestly as possible")
 
-with st.form(key="questionnaire_form"):
-    age_group = st.selectbox(
-        "What is your age?",
-        ["Under 10", "10-15", "15-25", "25-35", "35-45", "Over 45"]
-    )
-    
-    situation = st.selectbox(
-        "Have you experienced any situation?",
-        ["Sexual abuse", "Family violence", "Breach of trust", "Rape at school or work", "Other"]
-    )
-    
-    frequency = st.selectbox(
-        "How often does it happen?",
-        ["It happened once", "Occasionally", "Frequently", "It's happening to me now"]
-    )
-    
-    relationship = st.selectbox(
-        "Relationship with the person",
-        ["Partner", "Family member", "Work", "Other"]
-    )
-    
-    talked_to_someone = st.selectbox(
-        "Have you talked to someone?",
-        ["Yes", "No"]
-    )
-    
-    submitted = st.form_submit_button("Submit")
-    
-    if submitted:
-        response_data = {
-            'age_group': age_group,
-            'situation': situation,
-            'frequency': frequency,
-            'relationship': relationship,
-            'talked_to_someone': talked_to_someone
-        }
-        
-        if save_response(response_data):
+with st.form("survey_form"):
+    age_q = st.selectbox("What is your age?", ["Under 10", "10-15", "15-25", "25-35", "35-45", "Over 45"])
+    sit_q = st.selectbox("Have you experienced any situation?", ["Sexual abuse", "Family violence", "Breach of trust", "Rape at school or work", "Other"])
+    freq_q = st.selectbox("How often does it happen?", ["It happened once", "Occasionally", "Frequently", "It's happening to me now"])
+    rel_q = st.selectbox("Relationship with the person", ["Partner", "Family member", "Work", "Other"])
+    talk_q = st.selectbox("Have you talked to someone?", ["Yes", "No"])
+    if st.form_submit_button("Submit"):
+        if save_response({'age_group':age_q, 'situation':sit_q, 'frequency':freq_q, 'relationship':rel_q, 'talked_to_someone':talk_q}):
             st.success("Thank you for your trust! Your response has been saved.")
             st.balloons()
-        else:
-            st.error("There was an error saving your response. Please try again.")
 
 if st.button("Need help"):
     st.warning("""Call: 800 10 84 053 or 079. Remember, you are not alone. You can go to the following locations, don't be afraid to speak:
@@ -526,11 +247,7 @@ Galaxia 543, 76085 Santiago de Querétaro, Querétaro
 Municipal Women's Secretariat Corregidora Querétaro
 Calle Monterrey, 76902 Corregidora, Querétaro""")
 
-df_responses = load_questionnaire_responses()
-if not df_responses.empty:
+df_res = load_questionnaire_responses()
+if not df_res.empty:
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### 📊 Questionnaire Statistics")
-    st.sidebar.metric("Responses received", len(df_responses))
-    # Pequeño ajuste aquí para evitar error si timestamp es datetime
-    last_resp = str(df_responses['timestamp'].max()).split()[0]
-    st.sidebar.metric("Last response", last_resp if not df_responses.empty else "N/A")
+    st.sidebar.metric("Responses received", len(df_res))
