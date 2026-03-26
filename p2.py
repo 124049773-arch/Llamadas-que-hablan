@@ -93,20 +93,26 @@ def load_data():
     zip_path = "linea-mujeres-cdmx.zip" 
     try:
         with zipfile.ZipFile(zip_path, 'r') as z:
+            # Buscamos el archivo CSV dentro del ZIP
             csv_files = [f for f in z.namelist() if f.lower().endswith('.csv')]
             if not csv_files:
                 st.error("El ZIP no tiene un CSV adentro.")
                 st.stop()
             
             with z.open(csv_files[0]) as f:
-                # Agregamos sep=',' para que separe las columnas correctamente
-                df = pd.read_csv(f, encoding="latin1", sep=',', on_bad_lines='skip')
+                # sep=None y engine='python' detectan automáticamente el separador (, o ;)
+                # skipinitialspace=True quita espacios basura después de las comas
+                df = pd.read_csv(f, encoding="latin1", sep=None, engine='python', skipinitialspace=True)
         
-        # Limpiamos los nombres de las columnas (quita espacios y pone minúsculas)
-        df.columns = df.columns.str.lower().str.strip()
+        # Limpieza profunda de columnas
+        # 1. Quita espacios al inicio y final
+        # 2. Pone todo en minúsculas
+        # 3. Elimina posibles comillas extra que Excel a veces pone
+        df.columns = df.columns.str.lower().str.strip().str.replace('"', '').str.replace("'", "")
+        
         return df
     except Exception as e:
-        st.error(f"Error crítico: {e}")
+        st.error(f"Error crítico al leer los datos: {e}")
         st.stop()
 
 df = load_data()
