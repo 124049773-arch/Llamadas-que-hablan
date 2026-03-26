@@ -131,7 +131,7 @@ def load_data():
 st.sidebar.header("Filters")
 
 # Filter by State
-available_states = df['estado_usuaria'].unique()
+#available_states = df['estado_usuaria'].unique()
 # ==================== FILTERS ====================
 st.sidebar.header("Filters")
 
