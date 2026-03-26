@@ -79,7 +79,7 @@ def load_data():
                 st.stop()
             with z.open(csv_files[0]) as f:
                 # sep=None detecta automáticamente si el archivo usa , o ;
-                df = pd.read_csv(f, encoding="latin1", sep=None, engine='python', on_bad_lines='skip')
+                df = pd.read_csv(f, encoding="latin1", sep=',', on_bad_lines='skip')
         
         # Limpieza de nombres de columnas: quita espacios, comillas y pasa a minúsculas
         df.columns = [str(c).lower().strip().replace('"', '').replace("'", "") for c in df.columns]
