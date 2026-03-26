@@ -90,19 +90,31 @@ init_database()
 # ==================== END DATABASE CONFIGURATION ====================
 @st.cache_data
 def load_data():
-    # Si el CSV no existe, descomprimir el ZIP
     csv_filename = "linea-mujeres-cdmx.csv"
+    zip_filename = "linea-mujeres-cdmx.zip"
     
     if not os.path.exists(csv_filename):
-        with zipfile.ZipFile("linea-mujeres-cdmx.zip", 'r') as zip_ref:
-            zip_ref.extractall()
+        if os.path.exists(zip_filename):
+            try:
+                with zipfile.ZipFile(zip_filename, 'r') as zip_ref:
+                    zip_ref.extractall()
+            except Exception as e:
+                st.error(f"Error extracting ZIP file: {e}")
+                return pd.DataFrame()
+        else:
+            st.error(f"Neither {csv_filename} nor {zip_filename} found. Please upload the data files.")
+            return pd.DataFrame()
     
-    df = pd.read_csv(csv_filename, encoding="latin1")
-    df.columns = df.columns.str.lower().str.strip()
-    return df
-
-# Llamar la función para obtener los datos
-df = load_data()
+    try:
+        df = pd.read_csv(csv_filename, encoding="latin1")
+        df.columns = df.columns.str.lower().str.strip()
+        return df
+    except FileNotFoundError:
+        st.error(f"CSV file '{csv_filename}' not found after extraction.")
+        return pd.DataFrame()
+    except Exception as e:
+        st.error(f"Error reading CSV: {e}")
+        return pd.DataFrame()
 # ==================== FILTERS ====================
 st.sidebar.header("Filters")
 
