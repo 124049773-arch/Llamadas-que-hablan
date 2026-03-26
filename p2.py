@@ -99,10 +99,9 @@ def load_data():
                 st.error("El ZIP no tiene un CSV adentro.")
                 st.stop()
             
-            # AQUÍ ES DONDE SE DEFINE 'f'
-        # Cambiamos "utf-8" por "latin1" para que acepte acentos y eñes
-with z.open(csv_files[0]) as f:
-    df = pd.read_csv(f, encoding="latin1")
+            # Usamos latin1 para evitar errores de acentos y eñes
+            with z.open(csv_files[0]) as f:
+                df = pd.read_csv(f, encoding="latin1")
         
         # Limpiamos los nombres de las columnas
         df.columns = df.columns.str.lower().str.strip()
@@ -110,8 +109,10 @@ with z.open(csv_files[0]) as f:
     except Exception as e:
         st.error(f"Error crítico: {e}")
         st.stop()
+
 df = load_data()
 st.write("Columnas detectadas en tu archivo:", df.columns.tolist())
+
 # ==================== FILTERS ====================
 st.sidebar.header("Filters")
 
