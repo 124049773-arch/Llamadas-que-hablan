@@ -90,22 +90,25 @@ init_database()
 
 @st.cache_data
 def load_data():
-    zip_path = "linea-mujeres-cdmx.zip" # Asegúrate que este nombre sea IGUAL al archivo subido
+    zip_path = "linea-mujeres-cdmx.zip" 
     try:
         with zipfile.ZipFile(zip_path, 'r') as z:
+            # Buscamos el archivo CSV dentro del ZIP
             csv_files = [f for f in z.namelist() if f.lower().endswith('.csv')]
             if not csv_files:
                 st.error("El ZIP no tiene un CSV adentro.")
                 st.stop()
+            
+            # AQUÍ ES DONDE SE DEFINE 'f'
             with z.open(csv_files[0]) as f:
-                df = pd.read_csv(f, encoding="latin1")
+                df = pd.read_csv(f, encoding="utf-8") # O "latin1" si utf-8 falla
+        
+        # Limpiamos los nombres de las columnas
         df.columns = df.columns.str.lower().str.strip()
         return df
     except Exception as e:
         st.error(f"Error crítico: {e}")
         st.stop()
-# ==================== FILTERS ====================
-df = pd.read_csv(f, encoding="utf-8")
 df = load_data()
 st.write("Columnas detectadas en tu archivo:", df.columns.tolist())
 # ==================== FILTERS ====================
