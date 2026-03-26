@@ -89,18 +89,25 @@ init_database()
 
 @st.cache_data
 def load_data():
-    # CAMBIO: Ahora abre el archivo ZIP y busca el CSV adentro
     zip_path = "linea-mujeres-cdmx.zip"
     try:
         with zipfile.ZipFile(zip_path, 'r') as z:
-            # Esto busca cualquier archivo que termine en .csv dentro de tu zip
-            csv_name = [f for f in z.namelist() if f.endswith('.csv')][0]
-            with z.open(csv_name) as f:
+            # Listamos todos los archivos dentro del zip
+            todos_los_archivos = z.namelist()
+            # Buscamos el que termine en .csv
+            csv_files = [f for f in todos_los_archivos if f.lower().endswith('.csv')]
+            
+            if not csv_files:
+                st.error("El archivo ZIP no contiene ningún archivo .csv")
+                st.stop()
+                
+            with z.open(csv_files[0]) as f:
                 df = pd.read_csv(f, encoding="latin1")
+        
         df.columns = df.columns.str.lower().str.strip()
         return df
     except Exception as e:
-        st.error(f"Error: Asegúrate de que el archivo se llame linea-mujeres-cdmx.zip y contenga el CSV. Detalle: {e}")
+        st.error(f"Error crítico: {e}")
         st.stop()
 
 df = load_data()
