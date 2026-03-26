@@ -89,75 +89,43 @@ def load_questionnaire_responses():
 init_database()
 @st.cache_data
 def load_data():
-    csv_filename = "linea-mujeres-cdmx.csv"
-    zip_filename = "linea-mujeres-cdmx.zip"
-    
-    if os.path.exists(csv_filename):
-        try:
-            df = pd.read_csv(csv_filename, encoding="latin1", sep=",")
-            df.columns = df.columns.str.lower().str.strip()
-            return df
-        except Exception as e:
-            st.error(f"Error reading CSV file: {e}")
-            return pd.DataFrame()
-    
-    if os.path.exists(zip_filename):
-        try:
-            with zipfile.ZipFile(zip_filename, 'r') as zip_ref:
-                file_list = zip_ref.namelist()
-                csv_files = [f for f in file_list if f.endswith('.csv')]
-                
-                if not csv_files:
-                    st.error(f"No CSV files found in {zip_filename}")
-                    return pd.DataFrame()
-                
-                zip_ref.extractall()
-                csv_to_read = csv_files[0]
-                
-                if os.path.exists(csv_to_read):
-                    # Read with explicit parameters
-                    df = pd.read_csv(
-                        csv_to_read, 
-                        encoding="latin1", 
-                        sep=",",
-                        dtype=str  # Read all as strings first to preserve data
-                    )
-                    # Clean column names
-                    df.columns = df.columns.str.lower().str.strip()
-                    
-                    # Convert numeric columns
-                    numeric_cols = ['edad', 'ano_alta', 'mes_alta', 'dia_alta', 'hora_alta']
-                    for col in numeric_cols:
-                        if col in df.columns:
-                            df[col] = pd.to_numeric(df[col], errors='coerce')
-                    
-                    return df
-                else:
-                    st.error(f"CSV file '{csv_to_read}' not found after extraction")
-                    return pd.DataFrame()
-        except Exception as e:
-            st.error(f"Error extracting or reading ZIP file: {e}")
-            import traceback
-            st.error(traceback.format_exc())
-            return pd.DataFrame()
-    else:
-        st.error(f"ZIP file '{zip_filename}' not found in the repository")
-        return pd.DataFrame()
+    zip_path = "linea-mujeres-cdmx.zip" 
+    try:
+        with zipfile.ZipFile(zip_path, 'r') as z:
+            csv_files = [f for f in z.namelist() if f.lower().endswith('.csv')]
+            if not csv_files:
+                st.error("Archivo CSV no encontrado dentro del ZIP.")
+                st.stop()
+            with z.open(csv_files[0]) as f:
+                # Leemos detectando separador automáticamente
+                df = pd.read_csv(f, encoding="latin1", sep=None, engine='python', on_bad_lines='skip')
+        
+        # 1. Limpieza básica de nombres
+        df.columns = [str(c).lower().strip().replace('"', '').replace("'", "") for c in df.columns]
+        
+        # 2. MAPEEO INTELIGENTE (Si el nombre no es exacto, lo renombramos)
+        # Esto busca columnas que CONTENGAN la palabra clave
+        rename_dict = {}
+        for col in df.columns:
+            if 'estado' in col and 'usuaria' in col: rename_dict[col] = 'estado_usuaria'
+            if 'muni' in col and 'usuaria' in col: rename_dict[col] = 'municipio_usuaria'
+            if 'edad' in col: rename_dict[col] = 'edad'
+            if 'ocup' in col: rename_dict[col] = 'ocupacion'
+            if 'mes' in col and 'alta' in col: rename_dict[col] = 'mes_alta'
+            if 'fecha' in col and 'alta' in col: rename_dict[col] = 'fecha_alta'
+            if 'civil' in col: rename_dict[col] = 'estado_civil'
+            if 'servicio' in col: rename_dict[col] = 'servicio'
 
-df = load_data()
-
-if df.empty:
-    st.error("Failed to load data. Please check that the data files are present.")
-    st.stop()
-
-# Verify expected columns exist
-expected_cols = ['estado_usuaria', 'municipio_usuaria', 'edad', 'ocupacion']
-missing_cols = [col for col in expected_cols if col not in df.columns]
-
-if missing_cols:
-    st.error(f"Missing expected columns: {missing_cols}")
-    st.write("Available columns:", df.columns.tolist())
-    st.stop()
+        df = df.rename(columns=rename_dict)
+        
+        # 3. Limpieza de datos
+        if 'edad' in df.columns:
+            df['edad'] = pd.to_numeric(df['edad'], errors='coerce')
+            
+        return df
+    except Exception as e:
+        st.error(f"Error al procesar columnas: {e}")
+        st.stop()
 
 # ==================== FILTERS ====================
 st.sidebar.header("Filters")
