@@ -93,22 +93,21 @@ def load_data():
     zip_path = "linea-mujeres-cdmx.zip" 
     try:
         with zipfile.ZipFile(zip_path, 'r') as z:
-            # Buscamos el archivo CSV dentro del ZIP
             csv_files = [f for f in z.namelist() if f.lower().endswith('.csv')]
             if not csv_files:
                 st.error("El ZIP no tiene un CSV adentro.")
                 st.stop()
             
             with z.open(csv_files[0]) as f:
-                # sep=None y engine='python' detectan automáticamente el separador (, o ;)
-                # skipinitialspace=True quita espacios basura después de las comas
-                df = pd.read_csv(f, encoding="latin1", sep=None, engine='python', skipinitialspace=True)
+                # Detecta automáticamente si usa , o ; y acepta acentos con latin1
+                df = pd.read_csv(f, encoding="latin1", sep=None, engine='python', on_bad_lines='skip')
         
-        # Limpieza profunda de columnas
-        # 1. Quita espacios al inicio y final
-        # 2. Pone todo en minúsculas
-        # 3. Elimina posibles comillas extra que Excel a veces pone
-        df.columns = df.columns.str.lower().str.strip().str.replace('"', '').str.replace("'", "")
+        # LIMPIEZA DE COLUMNAS: Elimina espacios, comillas y pasa a minúsculas
+        df.columns = [str(c).lower().strip().replace('"', '').replace("'", "") for c in df.columns]
+        
+        # Limpieza de datos numéricos
+        if 'edad' in df.columns:
+            df['edad'] = pd.to_numeric(df['edad'], errors='coerce')
         
         return df
     except Exception as e:
@@ -116,7 +115,6 @@ def load_data():
         st.stop()
 
 df = load_data()
-st.write("Columnas detectadas en tu archivo:", df.columns.tolist())
 
 # ==================== FILTERS ====================
 st.sidebar.header("Filters")
