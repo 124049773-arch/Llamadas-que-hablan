@@ -93,17 +93,16 @@ def load_data():
     zip_path = "linea-mujeres-cdmx.zip" 
     try:
         with zipfile.ZipFile(zip_path, 'r') as z:
-            # Buscamos el archivo CSV dentro del ZIP
             csv_files = [f for f in z.namelist() if f.lower().endswith('.csv')]
             if not csv_files:
                 st.error("El ZIP no tiene un CSV adentro.")
                 st.stop()
             
-            # Usamos latin1 para evitar errores de acentos y eñes
             with z.open(csv_files[0]) as f:
-                df = pd.read_csv(f, encoding="latin1", sep=',')
+                # Agregamos sep=',' para que separe las columnas correctamente
+                df = pd.read_csv(f, encoding="latin1", sep=',', on_bad_lines='skip')
         
-        # Limpiamos los nombres de las columnas
+        # Limpiamos los nombres de las columnas (quita espacios y pone minúsculas)
         df.columns = df.columns.str.lower().str.strip()
         return df
     except Exception as e:
