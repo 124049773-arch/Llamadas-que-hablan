@@ -103,25 +103,39 @@ def load_data():
             st.error(f"Error reading CSV file: {e}")
             return pd.DataFrame()
     
-    # Try to extract from ZIP
+    # Try to extract from ZIP and find CSV files
     if os.path.exists(zip_filename):
         try:
             with zipfile.ZipFile(zip_filename, 'r') as zip_ref:
+                # List all files in the ZIP
+                file_list = zip_ref.namelist()
+                
+                # Find CSV files
+                csv_files = [f for f in file_list if f.endswith('.csv')]
+                
+                if not csv_files:
+                    st.error(f"No CSV files found in {zip_filename}")
+                    return pd.DataFrame()
+                
+                # Extract all files
                 zip_ref.extractall()
-            
-            # Now try to read the CSV
-            if os.path.exists(csv_filename):
-                df = pd.read_csv(csv_filename, encoding="latin1")
-                df.columns = df.columns.str.lower().str.strip()
-                return df
-            else:
-                st.error(f"CSV file '{csv_filename}' not found in ZIP archive")
-                return pd.DataFrame()
+                
+                # Try to read the first CSV file found
+                csv_to_read = csv_files[0]
+                st.info(f"Loading data from: {csv_to_read}")
+                
+                if os.path.exists(csv_to_read):
+                    df = pd.read_csv(csv_to_read, encoding="latin1")
+                    df.columns = df.columns.str.lower().str.strip()
+                    return df
+                else:
+                    st.error(f"CSV file '{csv_to_read}' not found after extraction")
+                    return pd.DataFrame()
         except Exception as e:
             st.error(f"Error extracting or reading ZIP file: {e}")
             return pd.DataFrame()
     else:
-        st.error(f"Neither '{csv_filename}' nor '{zip_filename}' found in the repository")
+        st.error(f"ZIP file '{zip_filename}' not found in the repository")
         return pd.DataFrame()
 
 # Load the data
