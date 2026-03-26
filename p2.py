@@ -101,7 +101,7 @@ def load_data():
             
             # Usamos latin1 para evitar errores de acentos y eñes
             with z.open(csv_files[0]) as f:
-                df = pd.read_csv(f, encoding="latin1")
+                df = pd.read_csv(f, encoding="latin1", sep=',')
         
         # Limpiamos los nombres de las columnas
         df.columns = df.columns.str.lower().str.strip()
