@@ -144,11 +144,14 @@ state = st.sidebar.multiselect(
 )
 
 # Filter by state first
-if state:
-    filtered_df_state = df[df['estado_usuaria'].isin(state)]
-else:
-    filtered_df_state = df
+uploaded_file = st.file_uploader("Sube tu archivo", type=["csv"])
 
+if uploaded_file is not None:
+    df = pd.read_csv(uploaded_file)
+    available_states = df['estado_usuaria'].unique()
+    st.write(available_states)
+else:
+    st.warning("Primero sube un archivo.")
 # Filter by Municipality
 available_municipalities = filtered_df_state['municipio_usuaria'].unique()
 municipality = st.sidebar.multiselect(
